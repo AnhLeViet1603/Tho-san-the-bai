@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Thợ Săn Thẻ Bài</title>
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/theme-forest.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/views.css">
+</head>
+<body>
+  <div id="boot" class="boot">
+    <div class="boot-ico">🧬</div>
+    <div id="bootMsg">Đang đánh thức khu rừng…</div>
+  </div>
+
+  <div id="app" class="app" hidden>
+    <aside class="side">
+      <a class="brand" href="landing.html" title="Xem trang giới thiệu">
+        <span class="brand-ico">🧬</span>
+        <div>
+          <b>Thợ Săn Thẻ Bài</b>
+          <small>Khu rừng tiến hoá</small>
+        </div>
+      </a>
+      <nav id="nav" class="nav"></nav>
+      <div id="sideClass" class="side-foot"></div>
+    </aside>
+    <main class="main" id="main">
+      <div id="view"></div>
+    </main>
+  </div>
+
+  <div id="toasts" class="toasts"></div>
+
+  <!-- Thư viện (offline) -->
+  <script src="vendor/sql-asm.js"></script>
+  <script src="vendor/xlsx.full.min.js"></script>
+  <script src="vendor/chart.umd.min.js"></script>
+
+  <!-- Lõi -->
+  <script src="js/core/ui.js"></script>
+  <script src="js/core/time.js"></script>
+  <script src="js/core/db.js"></script>
+  <script src="js/core/store.js"></script>
+  <script src="js/core/router.js"></script>
+
+  <!-- Dữ liệu -->
+  <script src="js/data/settings.js"></script>
+  <script src="js/data/schoolyear.js"></script>
+  <script src="js/data/classes.js"></script>
+  <script src="js/data/students.js"></script>
+  <script src="js/data/lessons.js"></script>
+  <script src="js/data/atp.js"></script>
+  <script src="js/data/cards.js"></script>
+  <script src="js/data/evolutions.js"></script>
+  <script src="js/data/groups.js"></script>
+  <script src="js/data/stats.js"></script>
+
+  <!-- Tính năng dùng chung -->
+  <script src="js/features/picker.js"></script>
+  <script src="js/features/award.js"></script>
+  <script src="js/features/evolve.js"></script>
+  <script src="js/features/excel-import.js"></script>
+  <script src="js/features/backup.js"></script>
+
+  <!-- Màn hình -->
+  <script src="js/views/home.js"></script>
+  <script src="js/views/lesson.js"></script>
+  <script src="js/views/groups.js"></script>
+  <script src="js/views/cards.js"></script>
+  <script src="js/views/dashboard.js"></script>
+  <script src="js/views/settings.js"></script>
+
+  <script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+# Hệ điều hành
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Trình soạn thảo / công cụ
+.vscode/
+.idea/
+*.swp
+.claude/
+.codegraph/
+
+# Node (chỉ dùng để chạy test, dự án không có phụ thuộc npm)
+node_modules/
+npm-debug.log*
+
+# File sao lưu xuất từ ứng dụng — chứa dữ liệu học sinh thật, không đưa lên repo
+*.sqlite
+*.sqlite3
+*.db
+
+# Kết quả test
+screenshots/
+coverage/
+*.log

@@ -1,0 +1,70 @@
+// Sự kiện ATP: ghi, tính tổng, hoàn tác
+(function (T) {
+  'use strict';
+
+  const TYPES = {
+    speak: { label: 'Phát biểu', icon: '🗣️', setting: 'atp_speak' },
+    score_8_9: { label: 'Điểm 8–9', icon: '⭐', setting: 'atp_score_8_9' },
+    score_9_plus: { label: 'Điểm 9+', icon: '🌟', setting: 'atp_score_9_plus' },
+    manual: { label: 'Thủ công', icon: '✎', setting: null }
+  };
+
+  const amountFor = type => (TYPES[type].setting ? T.settings.num(TYPES[type].setting, 0) : 0);
+
+  // Ghi một lượt cộng cho nhiều học sinh; amount được chụp lại tại thời điểm ghi
+  function award(studentIds, lessonId, type, opts = {}) {
+    const lesson = T.lessons.get(lessonId);
+    const amount = opts.amount != null ? opts.amount : amountFor(type);
+    const batch = Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+    T.db.tx(() => studentIds.forEach(sid => T.db.run(
+      `INSERT INTO atp_events (student_id, class_id, lesson_id, type, amount, group_id, batch_id, note)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [sid, lesson.class_id, lessonId, type, amount, opts.groupId || null, batch, opts.note || null])));
+    return amount;
+  }
+
+  function toMap(rows) {
+    const map = {};
+    rows.forEach(r => { map[r.student_id] = r.total; });
+    return map;
+  }
+
+  // ATP được tính lại từ 0 mỗi năm học: chỉ cộng các lượt ghi trong năm học hiện tại
+  function totalsByClass(classId) {
+    const r = T.schoolYear.range();
+    return toMap(T.db.query(`
+      SELECT student_id, SUM(amount) AS total FROM atp_events
+      WHERE class_id = ? AND created_at >= ? AND created_at < ? GROUP BY student_id`,
+      [classId, r.startSql, r.endSql]));
+  }
+
+  function totalFor(studentId) {
+    const r = T.schoolYear.range();
+    return T.db.scalar(`
+      SELECT COALESCE(SUM(amount), 0) FROM atp_events
+      WHERE student_id = ? AND created_at >= ? AND created_at < ?`, [studentId, r.startSql, r.endSql]);
+  }
+
+  const totalsByLesson = lessonId => toMap(T.db.query(
+    'SELECT student_id, SUM(amount) AS total FROM atp_events WHERE lesson_id = ? GROUP BY student_id', [lessonId]));
+
+  // Xoá lượt cộng gần nhất của tiết; trả về số sự kiện đã xoá
+  function undoLast(lessonId) {
+    const last = T.db.get('SELECT id, batch_id FROM atp_events WHERE lesson_id = ? ORDER BY id DESC LIMIT 1', [lessonId]);
+    if (!last) return 0;
+    const n = T.db.scalar('SELECT COUNT(*) FROM atp_events WHERE lesson_id = ? AND batch_id = ?', [lessonId, last.batch_id]);
+    T.db.run('DELETE FROM atp_events WHERE lesson_id = ? AND batch_id = ?', [lessonId, last.batch_id]);
+    return n;
+  }
+
+  const history = lessonId => T.db.query(`
+    SELECT e.*, s.name AS student_name, g.name AS group_name
+    FROM atp_events e
+    JOIN students s ON s.id = e.student_id
+    LEFT JOIN groups g ON g.id = e.group_id
+    WHERE e.lesson_id = ? ORDER BY e.id DESC`, [lessonId]);
+
+  const removeEvent = id => T.db.run('DELETE FROM atp_events WHERE id = ?', [id]);
+
+  T.atp = { TYPES, amountFor, award, totalsByClass, totalFor, totalsByLesson, undoLast, history, removeEvent };
+})(window.TSTB);

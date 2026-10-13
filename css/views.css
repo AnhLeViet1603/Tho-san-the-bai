@@ -1,0 +1,90 @@
+/* Layout riêng từng màn hình */
+
+/* Khu rừng */
+.class-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; }
+.class-card {
+  --accent: var(--leaf);
+  display: grid; gap: 6px; justify-items: start; text-align: left; padding: 18px; cursor: pointer;
+  border-radius: 18px; border: 1px solid var(--line); border-top: 3px solid var(--accent);
+  background: var(--panel); box-shadow: var(--shadow); transition: transform .15s, box-shadow .15s;
+}
+.class-card:hover { transform: translateY(-4px); box-shadow: 0 0 26px color-mix(in srgb, var(--accent) 35%, transparent), var(--shadow); }
+.class-card b { font-size: 1.25rem; }
+.class-card small { color: var(--muted); }
+.class-ico { font-size: 44px; }
+.class-meta { display: flex; gap: 14px; margin-top: 8px; font-size: .9rem; color: var(--muted); flex-wrap: wrap; }
+
+/* Tiết học */
+.stu-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(232px, 1fr)); gap: 12px; }
+.stu {
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: 7px; padding: 12px; border-radius: var(--radius);
+  background: var(--panel); border: 1px solid var(--line); transition: border-color .15s, box-shadow .15s;
+}
+.stu.sel { border-color: var(--leaf); box-shadow: 0 0 0 2px rgba(95, 224, 138, .25); }
+.stu-top { display: flex; align-items: center; gap: 8px; }
+.stu-top label { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; cursor: pointer; }
+.stu-name { font-weight: 700; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stu-cards { font-size: .82rem; color: var(--muted); }
+.stu-atp { color: var(--muted); }
+.stu-atp b { font-size: 1.5rem; color: var(--atp); text-shadow: 0 0 12px rgba(255, 201, 74, .4); }
+.stu-atp small { margin-left: 6px; color: var(--leaf); }
+.stu-next { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stu-btns { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) auto; gap: 5px; }
+.stu .evo-btn { white-space: normal; }
+.stu .evo-own { flex: none; }
+.stu-btns .btn { padding: 6px 4px; }
+
+/* Chia nhóm */
+.board { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; align-items: start; }
+.group {
+  --accent: var(--leaf);
+  display: grid; gap: 10px; padding: 12px; border-radius: var(--radius);
+  background: var(--panel); border: 1px solid var(--line); border-top: 3px solid var(--accent);
+}
+.group.pool { --accent: var(--muted); border-style: dashed; }
+.group.over { box-shadow: 0 0 0 2px var(--accent); }
+.group header { display: flex; align-items: center; gap: 8px; }
+.group header b { flex: 1; }
+.group header b[data-act] { cursor: pointer; }
+.group footer { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 5px; }
+.group footer .btn { padding: 6px 4px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; min-height: 40px; align-content: flex-start; }
+.chip {
+  padding: 4px 10px; border-radius: 99px; cursor: grab; font-size: .88rem; user-select: none;
+  background: rgba(255, 255, 255, .07); border: 1px solid var(--line);
+}
+.chip:hover { border-color: var(--leaf); }
+.chip.ready {
+  color: #2a1c00; font-weight: 600; border-color: var(--atp);
+  background: linear-gradient(135deg, #ffe08a, var(--atp)); animation: pulse 1.3s ease-in-out infinite;
+}
+.lesson-body { display: grid; gap: 18px; }
+.head-actions { align-items: center; flex-wrap: wrap; }
+
+/* Dashboard */
+.filters .class-chips { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.check-chip input { position: absolute; opacity: 0; pointer-events: none; }
+.check-chip span {
+  display: inline-block; padding: 5px 12px; border-radius: 99px; cursor: pointer;
+  background: rgba(255, 255, 255, .05); border: 1px solid var(--line);
+}
+.check-chip input:checked + span { background: rgba(95, 224, 138, .22); border-color: var(--leaf); font-weight: 600; }
+.check-chip input:focus-visible + span { box-shadow: 0 0 0 3px rgba(95, 224, 138, .25); }
+
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+.kpi { padding: 14px 16px; border-radius: var(--radius); background: var(--panel); border: 1px solid var(--line); display: grid; gap: 4px; }
+.kpi small { color: var(--muted); }
+.kpi b { font-size: 1.5rem; }
+
+.charts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.chart.wide { grid-column: span 2; }
+.chart h3 { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.chart h3 select { margin-left: auto; font-size: .85rem; font-weight: 400; padding: 4px 8px; }
+.chart-box { position: relative; height: 270px; }
+.chart-empty { height: 100%; display: grid; place-content: center; }
+
+@media (max-width: 1100px) {
+  .charts { grid-template-columns: 1fr; }
+  .chart.wide { grid-column: auto; }
+  .journey { grid-template-columns: 1fr; }
+}
