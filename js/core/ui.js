@@ -132,7 +132,9 @@ window.TSTB = window.TSTB || {};
             placeholder="${esc(f.placeholder)}">`;
         }
         return `<div class="field"><span>${esc(f.label)}</span>${ctl}${f.hint ? `<small>${esc(f.hint)}</small>` : ''}</div>`;
-      }).join('');
+      }).join('')
+        // Nút gửi ẩn: form có từ 2 ô nhập trở lên chỉ gửi khi nhấn Enter nếu có nút submit
+        + '<button type="submit" hidden></button>';
 
       el.addEventListener('click', e => {
         const em = e.target.closest('[data-emoji]');

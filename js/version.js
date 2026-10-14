@@ -3,6 +3,6 @@ window.TSTB = window.TSTB || {};
 (function (T) {
   'use strict';
 
-  T.version = '1.1.1';
+  T.version = '1.1.2';
   document.querySelectorAll('[data-version]').forEach(el => { el.textContent = 'v' + T.version; });
 })(window.TSTB);

@@ -2,6 +2,12 @@
 
 Mỗi phiên bản có một mục `## [x.y.z] - ngày`. Khi phát hành, nội dung của mục đó được dùng làm ghi chú release.
 
+## [1.1.2] - 2026-10-14
+
+### Sửa lỗi
+
+- Hộp thoại "Cộng / trừ ATP": gõ số rồi nhấn Enter giờ ghi nhận ngay như bấm nút Ghi nhận. Trước đây nhấn Enter không có tác dụng, ATP không được cộng. Các hộp thoại khác có từ hai ô nhập trở lên (sửa thẻ, sửa học sinh…) cũng nhận Enter.
+
 ## [1.1.1] - 2026-10-14
 
 Không thay đổi tính năng của ứng dụng.

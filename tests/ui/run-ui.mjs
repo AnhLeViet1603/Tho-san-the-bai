@@ -221,6 +221,18 @@ await group('4. Tiết học: cộng điểm cá nhân', async () => {
   check('trừ điểm thủ công ra số âm', await text('.stu .stu-atp b') === '-2');
   await click('[data-head="undo"]');
   await sleep(200);
+
+  // Gõ số rồi nhấn Enter bằng bàn phím thật, không bấm nút Ghi nhận
+  await click('.stu [data-act="manual"]');
+  await ev("(() => { const i = document.querySelector('.modal [name=\"amount\"]'); i.focus(); i.value = '3'; })()");
+  const enter = { key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 };
+  await send('Input.dispatchKeyEvent', Object.assign({ type: 'keyDown', text: String.fromCharCode(13) }, enter));
+  await send('Input.dispatchKeyEvent', Object.assign({ type: 'keyUp' }, enter));
+  await sleep(300);
+  check('nhấn Enter trong hộp Cộng / trừ ATP: ghi nhận và đóng hộp thoại',
+    await count('.modal-wrap') === 0 && await text('.stu .stu-atp b') === '3', await text('.stu .stu-atp b'));
+  await click('[data-head="undo"]');
+  await sleep(200);
 });
 
 await group('5. Tiến hoá: lật thẻ', async () => {
