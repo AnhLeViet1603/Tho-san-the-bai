@@ -1,0 +1,56 @@
+# Phát hành: push tag vX.Y.Z -> chạy test, đóng zip, tạo release kèm file zip
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Kiểm tra tag khớp với js/version.js
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          IN_FILE="$(sed -n "s/.*T\.version = '\([^']*\)'.*/\1/p" js/version.js)"
+          if [ "$VERSION" != "$IN_FILE" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME không khớp với js/version.js ($IN_FILE)"
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Chạy test đơn vị
+        run: node --test "tests/unit/*.test.js"
+
+      - name: Lấy ghi chú phát hành từ CHANGELOG.md
+        run: |
+          awk -v v="$VERSION" '
+            index($0, "## [" v "]") == 1 { on = 1; next }
+            on && /^## \[/ { exit }
+            on { print }
+          ' CHANGELOG.md > notes.md
+          if ! grep -q '[^[:space:]]' notes.md; then
+            echo "::error::CHANGELOG.md chưa có mục cho phiên bản $VERSION"
+            exit 1
+          fi
+
+      - name: Đóng zip
+        run: |
+          DIR="tho-san-the-bai-v$VERSION"
+          mkdir "$DIR"
+          cp -r index.html landing.html css js assets vendor LICENSE CHANGELOG.md "$DIR/"
+          zip -r "$DIR.zip" "$DIR"
+
+      - name: Tạo release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" "tho-san-the-bai-v$VERSION.zip" --title "$GITHUB_REF_NAME" --notes-file notes.md

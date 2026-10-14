@@ -12,9 +12,15 @@
 
 ## Bắt đầu
 
-1. Tải repo về (hoặc `git clone git@github.com:AnhLeViet1603/Tho-san-the-bai.git`).
+**Dùng ngay trên web:** mở <https://anhleviet1603.github.io/Tho-san-the-bai/> bằng Chrome hoặc Edge.
+
+**Tải về để dùng không cần mạng:**
+
+1. Tải file zip của bản mới nhất ở trang [Releases](https://github.com/AnhLeViet1603/Tho-san-the-bai/releases/latest) rồi giải nén.
 2. Mở `index.html` bằng **Chrome** hoặc **Edge** để vào ứng dụng.
 3. Mở `landing.html` nếu muốn xem trang giới thiệu.
+
+Dữ liệu của bản web và bản tải về nằm ở hai nơi riêng trong trình duyệt. Muốn chuyển qua lại thì xuất file sao lưu ở bên này rồi nhập vào bên kia.
 
 Lần chạy đầu tiên ứng dụng tự tạo cơ sở dữ liệu và 5 thẻ mẫu. Vào **Cài đặt** để tạo lớp và nhập danh sách học sinh.
 
@@ -93,7 +99,22 @@ node tests/ui/landing-ui.mjs
 
 Test giao diện tự tìm Edge hoặc Chrome ở đường dẫn cài đặt mặc định; nếu trình duyệt nằm chỗ khác, đặt biến môi trường `BROWSER_PATH`. Test dùng hồ sơ trình duyệt tạm nên không đụng tới dữ liệu thật.
 
-## Giấy phép bên thứ ba
+## Phát hành
+
+Lịch sử thay đổi nằm ở [CHANGELOG.md](CHANGELOG.md). Để ra một bản mới:
+
+1. Sửa số trong `js/version.js` và thêm mục `## [x.y.z] - ngày` vào `CHANGELOG.md`, rồi commit và push.
+2. Tạo và push tag trùng số đó: `git tag v1.2.0 && git push origin v1.2.0`.
+
+GitHub Actions (`.github/workflows/release.yml`) sẽ chạy test, đóng zip và tạo release kèm file zip.
+
+Bản trên web được cập nhật riêng: mỗi lần push lên `master`, `.github/workflows/pages.yml` chạy test rồi đưa ứng dụng lên GitHub Pages.
+
+## Giấy phép
+
+Mã nguồn dùng giấy phép [MIT](LICENSE): được tự do dùng, sửa và chia sẻ lại.
+
+Thành phần bên thứ ba giữ giấy phép riêng:
 
 - Phông chữ **Be Vietnam Pro** — SIL Open Font License, xem `assets/fonts/OFL.txt`.
 - **sql.js**, **SheetJS** và **Chart.js** trong `vendor/` thuộc giấy phép của từng dự án.

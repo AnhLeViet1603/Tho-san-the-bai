@@ -1,0 +1,47 @@
+# GitHub Pages: mỗi lần push lên master -> chạy test rồi đưa ứng dụng lên web
+name: Pages
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Chạy test đơn vị
+        run: node --test "tests/unit/*.test.js"
+
+      # Chỉ đưa lên những file ứng dụng cần để chạy
+      - name: Gom file ứng dụng
+        run: |
+          mkdir _site
+          cp -r index.html landing.html css js assets vendor LICENSE _site/
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
