@@ -108,6 +108,7 @@ await waitFor("document.getElementById('app') && !document.getElementById('app')
 // ============================================================
 await group('1. Khởi động', async () => {
   check('ứng dụng mở được qua file://', await ev("!document.getElementById('app').hidden"));
+  check('footer ghi số phiên bản', /^Thợ Săn Thẻ Bài v\d+\.\d+\.\d+$/.test((await text('.side-ver')).trim()), await text('.side-ver'));
   check('trạng thái trống ở Khu rừng', /Khu rừng còn trống/.test(await text('.view')));
   check('thanh điều hướng có 5 mục, không còn tab Chia nhóm', await count('#nav a') === 5 && !/Chia nhóm/.test(await text('#nav')));
   for (const r of ['tiet', 'the-bai', 'thong-ke']) {

@@ -66,6 +66,7 @@ landing.html        Trang giới thiệu
 css/                Giao diện (base, theme-forest, components, views, landing)
 js/
   app.js            Khởi động ứng dụng
+  version.js        Số phiên bản hiện ở footer
   core/             db (SQLite + IndexedDB), router (hash), store, time, ui
   data/             Truy vấn theo miền: lớp, học sinh, tiết, ATP, thẻ, tiến hoá, nhóm, thống kê
   features/         Cộng ATP, lật thẻ, chọn học sinh, nhập Excel, sao lưu
