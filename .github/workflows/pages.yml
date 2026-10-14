@@ -31,11 +31,16 @@ jobs:
       - name: Chạy test đơn vị
         run: node --test "tests/unit/*.test.js"
 
-      # Chỉ đưa lên những file ứng dụng cần để chạy
+      # Chỉ đưa lên những file ứng dụng cần để chạy.
+      # Trên web, trang giới thiệu là trang chủ còn ứng dụng nằm ở app.html
       - name: Gom file ứng dụng
         run: |
           mkdir _site
-          cp -r index.html landing.html css js assets vendor LICENSE _site/
+          cp -r css js assets vendor LICENSE _site/
+          sed 's|href="index.html"|href="app.html"|g' landing.html > _site/index.html
+          sed 's|href="landing.html"|href="./"|g' index.html > _site/app.html
+          grep -q 'href="app.html"' _site/index.html
+          grep -q 'href="./"' _site/app.html
 
       - uses: actions/configure-pages@v5
 
