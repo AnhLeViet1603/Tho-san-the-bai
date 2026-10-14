@@ -49,8 +49,29 @@
   document.getElementById('app').hidden = false;
   T.router.start();
 
-  // Ghi nốt thay đổi đang chờ khi rời trang
-  window.addEventListener('beforeunload', () => { T.db.flush(); });
+  // Chỉ báo trạng thái lưu ở thanh bên
+  const SAVE_TEXT = {
+    saved: '✓ Đã lưu',
+    pending: '… Đang lưu',
+    saving: '… Đang lưu',
+    error: '⚠ Chưa lưu được, đang thử lại'
+  };
+  const saveEl = document.getElementById('saveState');
+  T.db.onStatus(s => {
+    saveEl.dataset.state = s;
+    saveEl.textContent = SAVE_TEXT[s];
+  });
+
+  // Xin trình duyệt không tự dọn dữ liệu khi máy thiếu dung lượng
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+
+  // Ghi nốt thay đổi đang chờ khi rời trang; còn thay đổi chưa lưu thì trình duyệt hỏi lại
+  window.addEventListener('beforeunload', e => {
+    if (!T.db.dirty()) return;
+    T.db.flush();
+    e.preventDefault();
+    e.returnValue = '';
+  });
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') T.db.flush();
   });

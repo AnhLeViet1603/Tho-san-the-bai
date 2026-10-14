@@ -257,6 +257,8 @@
       <h2>Sao lưu & khôi phục</h2>
       <p class="muted">Dữ liệu được lưu trong trình duyệt này (IndexedDB), gắn với vị trí thư mục của ứng dụng.
         Hãy xuất file <b>.sqlite</b> định kỳ để sao lưu, hoặc khi đổi máy, đổi trình duyệt, di chuyển thư mục.</p>
+      <p class="muted" id="persistNote" hidden>⚠ Trình duyệt chưa cho phép giữ dữ liệu lâu dài: khi máy thiếu dung lượng,
+        dữ liệu có thể bị tự dọn. Hãy xuất file sao lưu thường xuyên hơn.</p>
       <div class="btn-row">
         <button type="button" class="btn" data-act="export">⬇ Xuất file .sqlite</button>
         <label class="btn ghost">⬆ Nhập file .sqlite<input type="file" id="importDb" accept=".sqlite,.db,.sqlite3" hidden></label>
@@ -264,6 +266,13 @@
       <h2>Vùng nguy hiểm</h2>
       <p class="muted">Xoá sạch mọi lớp, học sinh, ATP và thẻ bài, đưa ứng dụng về trạng thái ban đầu.</p>
       <button type="button" class="btn danger" data-act="reset">Xoá toàn bộ dữ liệu</button>`;
+
+    if (navigator.storage && navigator.storage.persisted) {
+      navigator.storage.persisted().then(ok => {
+        const note = body.querySelector('#persistNote');
+        if (note) note.hidden = ok;
+      }).catch(() => {});
+    }
 
     body.querySelector('#importDb').onchange = async e => {
       const file = e.target.files[0];

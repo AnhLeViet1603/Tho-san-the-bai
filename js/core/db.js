@@ -72,11 +72,22 @@
     ['Thẻ Linh Trưởng', '+1 điểm vào bài kiểm tra 1 tiết.', '🦧']
   ];
 
+  // Lưu lỗi thì thử lại sau 1s, 3s rồi cứ 10s một lần
+  const RETRY = [1000, 3000, 10000];
+
   let SQL = null;
   let db = null;
   let timer = null;
+  let retryTimer = null;
   let depth = 0;
   let persist = true;
+  let storage = null;  // { get, set }: mặc định là IndexedDB
+  let version = 0;     // tăng mỗi lần dữ liệu đổi
+  let savedVersion = 0;
+  let saving = null;
+  let failures = 0;
+  let status = 'saved'; // saved | pending | saving | error
+  const listeners = [];
 
   function openIdb() {
     return new Promise((resolve, reject) => {
@@ -106,20 +117,64 @@
     });
   }
 
-  function flush() {
+  function setStatus(next) {
+    if (next === status) return;
+    status = next;
+    listeners.forEach(fn => fn(next));
+  }
+
+  const dirty = () => persist && version !== savedVersion;
+
+  // Ghi bản hiện tại vào IndexedDB. Không bao giờ reject: lỗi thì giữ trạng thái "chưa lưu" và tự thử lại.
+  async function flush() {
     clearTimeout(timer);
     timer = null;
-    if (!db || !persist) return Promise.resolve();
-    return idbSet(db.export()).catch(err => {
+    clearTimeout(retryTimer);
+    retryTimer = null;
+    if (!db || !dirty()) return;
+    if (saving) {
+      await saving;
+      return flush();
+    }
+    const v = version;
+    setStatus('saving');
+    try {
+      saving = storage.set(db.export());
+      await saving;
+      savedVersion = v;
+      failures = 0;
+      setStatus(dirty() ? 'pending' : 'saved');
+      if (dirty()) timer = setTimeout(flush, 300);
+    } catch (err) {
       console.error(err);
-      T.ui.toast('Không lưu được dữ liệu: ' + err.message, 'error');
-    });
+      if (!persist) return;
+      if (!failures) T.ui.toast('Không lưu được dữ liệu: ' + (err && err.message) + '. Đang thử lại…', 'error');
+      retryTimer = setTimeout(flush, RETRY[Math.min(failures, RETRY.length - 1)]);
+      failures++;
+      setStatus('error');
+    } finally {
+      saving = null;
+    }
+  }
+
+  function changed() {
+    version++;
+    if (persist && status !== 'error') setStatus('pending');
   }
 
   function touch() {
     if (depth || !persist) return;
+    changed();
+    if (retryTimer) return; // đang chờ thử lại: lần thử đó sẽ lưu luôn thay đổi này
     clearTimeout(timer);
     timer = setTimeout(flush, 300);
+  }
+
+  // fn(status) được gọi mỗi khi trạng thái lưu đổi; trả về hàm huỷ đăng ký
+  function onStatus(fn) {
+    listeners.push(fn);
+    fn(status);
+    return () => listeners.splice(listeners.indexOf(fn), 1);
   }
 
   function run(sql, params) {
@@ -198,13 +253,22 @@
   }
 
   // opts.persist = false: chỉ giữ dữ liệu trong bộ nhớ (dùng cho test)
-  async function init(opts) {
+  // opts.storage = { get, set }: thay IndexedDB (dùng cho test)
+  async function init(opts = {}) {
     if (typeof initSqlJs !== 'function') throw new Error('Thiếu file vendor/sql-asm.js');
-    persist = !(opts && opts.persist === false);
-    SQL = await initSqlJs();
-    const bytes = persist ? await idbGet() : null;
+    persist = opts.persist !== false;
+    storage = opts.storage || { get: idbGet, set: idbSet };
+    clearTimeout(timer);
+    clearTimeout(retryTimer);
+    timer = retryTimer = null;
+    version = savedVersion = failures = 0;
+    status = 'saved';
+    if (!SQL) SQL = await initSqlJs();
+    const bytes = persist ? await storage.get() : null;
+    if (db) db.close();
     db = bytes ? new SQL.Database(bytes) : new SQL.Database();
     prepare();
+    changed();
     await flush();
   }
 
@@ -227,6 +291,7 @@
     db.close();
     db = next;
     prepare();
+    changed();
     await flush();
   }
 
@@ -234,15 +299,20 @@
     db.close();
     db = new SQL.Database();
     prepare();
+    changed();
     await flush();
   }
 
   // Ngừng ghi vào IndexedDB (tab khác đã nhận quyền ghi). Thay đổi sau đó chỉ nằm trong bộ nhớ.
   function detach() {
     clearTimeout(timer);
-    timer = null;
+    clearTimeout(retryTimer);
+    timer = retryTimer = null;
     persist = false;
   }
 
-  T.db = { init, run, query, get, scalar, insert, tx, flush, detach, exportBytes, importBytes, reset };
+  T.db = {
+    init, run, query, get, scalar, insert, tx, flush, dirty, onStatus, detach, exportBytes, importBytes, reset,
+    status: () => status
+  };
 })(window.TSTB);
