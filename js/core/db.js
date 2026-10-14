@@ -237,5 +237,12 @@
     await flush();
   }
 
-  T.db = { init, run, query, get, scalar, insert, tx, flush, exportBytes, importBytes, reset };
+  // Ngừng ghi vào IndexedDB (tab khác đã nhận quyền ghi). Thay đổi sau đó chỉ nằm trong bộ nhớ.
+  function detach() {
+    clearTimeout(timer);
+    timer = null;
+    persist = false;
+  }
+
+  T.db = { init, run, query, get, scalar, insert, tx, flush, detach, exportBytes, importBytes, reset };
 })(window.TSTB);

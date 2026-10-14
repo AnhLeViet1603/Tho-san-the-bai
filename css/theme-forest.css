@@ -15,6 +15,19 @@ body {
 .boot-ico { font-size: 56px; animation: spin 3s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* Màn che khi ứng dụng đang mở ở tab khác */
+.tab-block {
+  position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 20px;
+  background: rgba(3, 10, 6, .88); backdrop-filter: blur(4px);
+}
+.tab-block-box {
+  width: min(420px, 100%); display: grid; justify-items: center; gap: 12px; padding: 28px 24px;
+  text-align: center; background: #10281b; border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow);
+}
+.tab-block-box .boot-ico { animation: none; }
+.tab-block-box h2 { margin: 0; font-size: 20px; }
+.tab-block-box p { margin: 0; color: var(--muted); }
+
 .app { display: grid; grid-template-columns: 230px 1fr; height: 100vh; }
 
 .side {

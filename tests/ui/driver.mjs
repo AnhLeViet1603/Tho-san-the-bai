@@ -84,5 +84,5 @@ export async function launch(name) {
     process.exit(failed.length ? 1 : 0);
   }
 
-  return { send, ev, waitFor, shot, viewport, check, finish, pageErrors, shots };
+  return { send, ev, waitFor, shot, viewport, check, finish, pageErrors, shots, port };
 }

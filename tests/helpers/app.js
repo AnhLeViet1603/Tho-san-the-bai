@@ -13,6 +13,7 @@ const FILES = [
   'js/core/ui.js',
   'js/core/time.js',
   'js/core/db.js',
+  'js/core/tab-lock.js',
   'js/core/store.js',
   'js/core/router.js',
   'js/data/settings.js',

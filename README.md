@@ -95,6 +95,7 @@ node --test "tests/unit/*.test.js"
 # Test giao diện: điều khiển Edge/Chrome headless qua DevTools Protocol
 node tests/ui/run-ui.mjs
 node tests/ui/landing-ui.mjs
+node tests/ui/tab-lock-ui.mjs
 ```
 
 Test giao diện tự tìm Edge hoặc Chrome ở đường dẫn cài đặt mặc định; nếu trình duyệt nằm chỗ khác, đặt biến môi trường `BROWSER_PATH`. Test dùng hồ sơ trình duyệt tạm nên không đụng tới dữ liệu thật.

@@ -4,6 +4,7 @@ Thumbs.db
 desktop.ini
 
 # Trình soạn thảo / công cụ
+.ai/*
 .vscode/
 .idea/
 *.swp
