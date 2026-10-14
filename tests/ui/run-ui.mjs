@@ -355,6 +355,54 @@ await group('8. Tab Thẻ tiến hoá', async () => {
   await closeModal();
 });
 
+await group('8b. Giáo viên sửa thẻ của học sinh', async () => {
+  const formOk = () => ev("[...document.querySelectorAll('.modal-wrap')].pop().querySelector('footer .btn:last-child').click()");
+  await click('table.pick tbody tr td');
+  check('mỗi lá có nút Sửa và Xoá', await count('.card-pick [data-tool="edit"]') === 1 && await count('.card-pick [data-tool="remove"]') === 1);
+  const oldName = await text('.card-pick .pcard-info b');
+
+  await click('.card-pick [data-tool="edit"]');
+  await sleep(200);
+  check('bấm Sửa: mở form, không hỏi dùng thẻ',
+    await count('select[name="card"]') === 1 && await count('input[name="expires"][type="date"]') === 1 && await count('.confirm-msg') === 0);
+  check('danh sách loại thẻ: thẻ hiện tại + các thẻ chưa giữ', await count('select[name="card"] option') === 5);
+  await fill('input[name="expires"]', '2099-12-31');
+  await formOk();
+  await sleep(250);
+  check('sửa hạn: bảng thẻ hiện ngày mới', /31\/12\/2099/.test(await text('.card-pick')), await text('.card-pick'));
+
+  await click('.card-pick [data-tool="edit"]');
+  await sleep(200);
+  await ev("(() => { const s = document.querySelector('select[name=\"card\"]'); s.value = s.options[1].value; })()");
+  await formOk();
+  await sleep(250);
+  const newName = await text('.card-pick .pcard-info b');
+  check('đổi thẻ: lá bài thành loại khác, hạn tính lại theo thẻ mới',
+    newName && newName !== oldName && !/2099/.test(await text('.card-pick')), newName);
+  await shot('08b-sua-the');
+
+  await click('.card-pick [data-tool="edit"]');
+  await sleep(200);
+  await fill('input[name="expires"]', '');
+  await formOk();
+  await sleep(250);
+  check('bỏ trống ngày: thẻ không hết hạn', /Không hết hạn/.test(await text('.card-pick')));
+
+  await click('.card-pick [data-tool="remove"]');
+  await sleep(200);
+  await fill('select[name="mode"]', 'discard');
+  await formOk();
+  await sleep(250);
+  check('xoá thẻ: biến mất khỏi bảng', await count('.card-pick') === 0);
+  await closeModal();
+  await sleep(250);
+  check('lịch sử ghi “Giáo viên xoá” kèm nút Hoàn tác',
+    /Giáo viên xoá/.test(await text('#view')) && await count('[data-act="unuse"]') === 1);
+  await click('[data-act="unuse"]');
+  await sleep(200);
+  check('Hoàn tác: thẻ quay lại học sinh', await count('[data-act="unuse"]') === 0 && await count('table.pick .chip') === 1);
+});
+
 await group('9. Thống kê', async () => {
   await go('thong-ke');
   await sleep(400);

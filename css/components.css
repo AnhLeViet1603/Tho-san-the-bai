@@ -185,6 +185,9 @@ input[type=date] { color-scheme: dark; }
 .card-pick.locked .pcard { filter: grayscale(.7) brightness(.7); border-color: var(--line); box-shadow: none; transform: none; }
 .use-tag { color: var(--leaf); font-weight: 600; font-size: .85rem; }
 .lock-tag { color: var(--atp); font-size: .85rem; }
+.card-tools { display: flex; gap: 6px; width: 100%; }
+.card-tools .btn { flex: 1; }
+.card-pick.locked .card-tools { cursor: pointer; filter: none; }
 .pcard-foot { font-size: .85rem; }
 .table.pick tbody tr { cursor: pointer; }
 .toast.gold { border-color: var(--atp); background: #3a2e10; }

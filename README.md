@@ -24,6 +24,7 @@ Lần chạy đầu tiên ứng dụng tự tạo cơ sở dữ liệu và 5 th�
 |---|---|
 | ⚡ **Cộng ATP một lần bấm** | Phát biểu, điểm 8–9, điểm 9+ hoặc một số tuỳ ý. Chọn nhiều em để cộng cùng lúc, bấm nhầm thì hoàn tác. |
 | 🃏 **Thẻ tiến hoá** | Mỗi thẻ là một đặc quyền có hạn sử dụng. Tự đặt tên, nội dung và ảnh cho từng lá. |
+| ✎ **Sửa thẻ của học sinh** | Trong bảng thẻ của từng em: sửa ngày hết hạn, đổi sang loại thẻ khác, hoặc xoá thẻ (có hoặc không trả lại lượt lật). |
 | 🐾 **Chia nhóm trong tiết** | Chia ngẫu nhiên hoặc kéo thả. Cộng điểm cho nhóm thì mọi thành viên đều nhận ATP. |
 | 📊 **Thống kê** | Biểu đồ tròn, biểu đồ cột theo lớp, thời gian, loại hoạt động, nhóm, học sinh; kèm bảng xếp hạng. |
 | 📥 **Nhập từ Excel** | Chọn file `.xlsx` / `.xls` / `.csv`, chọn cột họ tên, xem trước rồi nhập. Tên trùng được bỏ qua. |

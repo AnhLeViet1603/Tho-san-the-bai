@@ -228,3 +228,104 @@ test('lưu thẻ với hạn dùng âm, số lẻ hoặc bỏ trống được c
   assert.equal(T.cards.get(id3).expire_days, 0);
   assert.match(T.cards.expiryLabel(T.cards.get(id1)), /Không hết hạn/);
 });
+
+test('setExpiry: hết hạn vào cuối ngày được chọn theo UTC+7, bỏ trống thì không hết hạn', async t => {
+  const { T } = await boot();
+  const { ids } = seedClass(T);
+  freeze(t, '2026-10-12T03:00:00Z');
+  T.evolutions.grant(ids[0], T.cards.list()[0], WEEK);
+  const id = T.evolutions.heldBy(ids[0])[0].grant_id;
+
+  assert.equal(T.evolutions.setExpiry(id, '2026-12-25'), true);
+  let row = T.evolutions.heldBy(ids[0])[0];
+  assert.equal(T.time.toSql(row.expires_at), '2026-12-25 16:59:59');
+  assert.equal(T.time.dateOf(row.expires_at), '2026-12-25');
+
+  assert.equal(T.evolutions.setExpiry(id, '2026-10-12'), true, 'hôm nay vẫn hợp lệ');
+  assert.equal(T.evolutions.daysLeft(T.evolutions.heldBy(ids[0])[0]), 0);
+
+  assert.equal(T.evolutions.setExpiry(id, ''), true);
+  row = T.evolutions.heldBy(ids[0])[0];
+  assert.equal(row.expires_at, null);
+  t.mock.timers.setTime(Date.parse('2099-01-01T00:00:00Z'));
+  T.evolutions.purge();
+  assert.equal(T.evolutions.heldBy(ids[0]).length, 1);
+});
+
+test('setExpiry: từ chối ngày đã qua, ngày sai định dạng và thẻ không còn giữ', async t => {
+  const { T } = await boot();
+  const { ids } = seedClass(T);
+  freeze(t, '2026-10-12T03:00:00Z');
+  T.evolutions.grant(ids[0], T.cards.list()[0], WEEK);
+  const row = T.evolutions.heldBy(ids[0])[0];
+
+  assert.equal(T.evolutions.setExpiry(row.grant_id, '2026-10-11'), false);
+  assert.equal(T.evolutions.setExpiry(row.grant_id, 'abc'), false);
+  assert.equal(T.evolutions.heldBy(ids[0])[0].expires_at, row.expires_at, 'hạn cũ giữ nguyên');
+
+  T.evolutions.use(row.grant_id, null);
+  assert.equal(T.evolutions.setExpiry(row.grant_id, '2026-12-25'), false);
+  assert.equal(T.evolutions.setExpiry(999999, '2026-12-25'), false);
+});
+
+test('swap: đổi loại thẻ, giữ lượt lật và tuần nhận, hạn tính lại theo thẻ mới', async t => {
+  const { T } = await boot();
+  const { ids } = seedClass(T);
+  const [a, b] = T.cards.list();
+  T.cards.save(Object.assign({}, b, { expire_days: 3 }));
+  freeze(t, '2026-10-12T03:00:00Z');
+  T.evolutions.grant(ids[0], a, WEEK);
+  const before = T.evolutions.heldBy(ids[0])[0];
+
+  t.mock.timers.setTime(Date.parse('2026-10-20T03:00:00Z'));
+  assert.equal(T.evolutions.swap(before.grant_id, b.id), true);
+  const after = T.evolutions.heldBy(ids[0])[0];
+  assert.equal(after.grant_id, before.grant_id);
+  assert.equal(after.id, b.id);
+  assert.equal(after.granted_at, before.granted_at);
+  assert.equal(T.evolutions.sameWeek(after, WEEK), true);
+  assert.equal(T.time.dateOf(after.expires_at), '2026-10-23', '3 ngày kể từ hôm đổi');
+  assert.equal(T.evolutions.flips(ids[0]), 1);
+  assert.ok(T.evolutions.available(ids[0]).some(c => c.id === a.id), 'thẻ cũ lật lại được');
+});
+
+test('swap: không đổi sang loại đang giữ, chính nó, thẻ không tồn tại hoặc lá đã dùng', async () => {
+  const { T } = await boot();
+  const { ids } = seedClass(T);
+  const [a, b, c] = T.cards.list();
+  T.evolutions.grant(ids[0], a, WEEK);
+  T.evolutions.grant(ids[0], b, WEEK);
+  const [ga, gb] = T.evolutions.heldBy(ids[0]).map(r => r.grant_id);
+
+  assert.equal(T.evolutions.swap(ga, b.id), false);
+  assert.equal(T.evolutions.swap(ga, a.id), false);
+  assert.equal(T.evolutions.swap(ga, 999999), false);
+  assert.equal(T.evolutions.swap(999999, c.id), false);
+  T.evolutions.use(gb, null);
+  assert.equal(T.evolutions.swap(gb, c.id), false);
+  assert.deepEqual(T.evolutions.heldBy(ids[0]).map(r => r.id), [a.id]);
+});
+
+test('discard: xoá thẻ không trả lượt lật, có trong lịch sử và hoàn tác được', async () => {
+  const { T } = await boot();
+  const { classId, ids } = seedClass(T);
+  const card = T.cards.list()[0];
+  T.evolutions.grant(ids[0], card, WEEK);
+  const id = T.evolutions.heldBy(ids[0])[0].grant_id;
+
+  T.evolutions.discard(id);
+  assert.equal(T.evolutions.heldBy(ids[0]).length, 0);
+  assert.equal(T.evolutions.flips(ids[0]), 1, 'lượt lật không quay lại');
+  const hist = T.evolutions.history(classId, 30);
+  assert.equal(hist.length, 1);
+  assert.equal(hist[0].status, 'removed');
+  assert.ok(hist[0].used_at, 'có ngày để hiện trong lịch sử');
+
+  assert.equal(T.evolutions.unuse(id), true);
+  assert.equal(T.evolutions.heldBy(ids[0]).length, 1);
+  assert.deepEqual(T.evolutions.history(classId, 30), []);
+
+  T.evolutions.use(id, null);
+  T.evolutions.discard(id);
+  assert.equal(T.db.scalar('SELECT status FROM student_cards WHERE id = ?', [id]), 'used', 'không đụng tới lá đã dùng');
+});

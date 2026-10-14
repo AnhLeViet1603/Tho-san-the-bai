@@ -59,16 +59,19 @@
       SELECT card_id FROM student_cards WHERE student_id = ? AND status = 'held')
     ORDER BY sort_order, id`, [studentId]);
 
+  const holds = (studentId, cardId) => !!T.db.scalar(
+    "SELECT 1 FROM student_cards WHERE student_id = ? AND card_id = ? AND status = 'held'", [studentId, cardId]);
+
+  // Hết hạn vào cuối ngày thứ N (UTC+7) kể từ hôm nay; null nếu thẻ không có hạn
+  const expiryFor = card => (card.expire_days > 0
+    ? T.time.dayStart(T.time.today()) + (card.expire_days + 1) * DAY - 1 : null);
+
   // when: { year, month, week } của tiết đang dạy. Trả về false nếu đã giữ thẻ này.
   function grant(studentId, card, when) {
-    if (T.db.scalar("SELECT 1 FROM student_cards WHERE student_id = ? AND card_id = ? AND status = 'held'",
-      [studentId, card.id])) return false;
-    const now = Date.now();
-    // Hết hạn vào cuối ngày thứ N (UTC+7) kể từ ngày nhận
-    const expires = card.expire_days > 0
-      ? T.time.dayStart(T.time.today()) + (card.expire_days + 1) * DAY - 1 : null;
+    if (holds(studentId, card.id)) return false;
     T.db.run(`INSERT INTO student_cards (student_id, card_id, year, month, week, granted_at, expires_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)`, [studentId, card.id, when.year, when.month, when.week, now, expires]);
+      VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [studentId, card.id, when.year, when.month, when.week, Date.now(), expiryFor(card)]);
     return true;
   }
 
@@ -79,17 +82,45 @@
     "UPDATE student_cards SET status = 'used', used_at = ?, lesson_id = ? WHERE id = ? AND status = 'held'",
     [Date.now(), lessonId || null, grantId]);
 
-  // Hoàn tác một lần dùng nhầm; trả về false nếu học sinh đã có lại thẻ cùng loại
+  // Hoàn tác một lần dùng nhầm hoặc xoá nhầm; trả về false nếu học sinh đã có lại thẻ cùng loại
   function unuse(grantId) {
     const row = T.db.get('SELECT * FROM student_cards WHERE id = ?', [grantId]);
-    if (!row || T.db.scalar("SELECT 1 FROM student_cards WHERE student_id = ? AND card_id = ? AND status = 'held'",
-      [row.student_id, row.card_id])) return false;
+    if (!row || holds(row.student_id, row.card_id)) return false;
     T.db.run("UPDATE student_cards SET status = 'held', used_at = NULL, lesson_id = NULL WHERE id = ?", [grantId]);
     return true;
   }
 
   // Thu hồi: xoá hẳn lượt lật, học sinh được lật lại
   const revoke = grantId => T.db.run('DELETE FROM student_cards WHERE id = ?', [grantId]);
+
+  // Giáo viên xoá thẻ nhưng không trả lại lượt lật; vẫn nằm trong lịch sử để hoàn tác
+  const discard = grantId => T.db.run(
+    "UPDATE student_cards SET status = 'removed', used_at = ? WHERE id = ? AND status = 'held'", [Date.now(), grantId]);
+
+  const heldRow = grantId => T.db.get("SELECT * FROM student_cards WHERE id = ? AND status = 'held'", [grantId]);
+
+  // Sửa hạn một lá đang giữ: hết hạn vào cuối ngày `dateStr` (UTC+7); bỏ trống = không hết hạn.
+  // Trả về false nếu ngày đã qua hoặc không hợp lệ.
+  function setExpiry(grantId, dateStr) {
+    let expires = null;
+    if (dateStr) {
+      expires = T.time.dayStart(dateStr) + DAY - 1;
+      if (!(expires >= Date.now())) return false;
+    }
+    if (!heldRow(grantId)) return false;
+    T.db.run('UPDATE student_cards SET expires_at = ? WHERE id = ?', [expires, grantId]);
+    return true;
+  }
+
+  // Đổi một lá đang giữ sang loại thẻ khác: giữ nguyên lượt lật và tuần nhận, hạn tính lại
+  // theo thẻ mới kể từ hôm nay. Trả về false nếu học sinh đã giữ loại thẻ đó.
+  function swap(grantId, cardId) {
+    const row = heldRow(grantId);
+    const card = T.cards.get(cardId);
+    if (!row || !card || row.card_id === card.id || holds(row.student_id, card.id)) return false;
+    T.db.run('UPDATE student_cards SET card_id = ?, expires_at = ? WHERE id = ?', [card.id, expiryFor(card), grantId]);
+    return true;
+  }
 
   const history = (classId, limit) => T.db.query(`
     SELECT h.*, s.name AS student_name FROM (${SELECT}) h JOIN students s ON s.id = h.student_id
@@ -107,6 +138,6 @@
 
   T.evolutions = {
     threshold, choices, purge, heldByClass, heldBy, flipsByClass, flips, pending, available,
-    grant, sameWeek, use, unuse, revoke, history, daysLeft, expiryText
+    grant, sameWeek, use, unuse, revoke, discard, setExpiry, swap, history, daysLeft, expiryText
   };
 })(window.TSTB);

@@ -5,6 +5,12 @@
 
   const dateText = ms => (ms ? T.time.fmt(ms) : '');
 
+  const RESULT = {
+    used: '<span class="atp">Đã dùng</span>',
+    expired: '<span class="muted">Hết hạn, tự xoá</span>',
+    removed: '<span class="muted">Giáo viên xoá</span>'
+  };
+
   function render(el) {
     const year = T.schoolYear.range().label;
     const cls = T.store.currentClass();
@@ -29,7 +35,7 @@
       : T.ui.empty('🃏', 'Chưa có thẻ tiến hoá', 'Thêm thẻ trong phần Cài đặt → Thẻ tiến hoá.')}
       ${cls ? `<div class="panel">
         <div class="panel-head">
-          <h2>Thẻ của học sinh <small class="muted">· năm học ${year} · bấm vào một em để xem và dùng thẻ</small></h2>
+          <h2>Thẻ của học sinh <small class="muted">· năm học ${year} · bấm vào một em để xem, dùng hoặc sửa thẻ</small></h2>
           <select id="cardClass">${classes.map(c =>
             `<option value="${c.id}" ${c.id === cls.id ? 'selected' : ''}>${esc((c.icon || '🌿') + ' ' + c.name)}</option>`).join('')}</select>
         </div>
@@ -51,9 +57,9 @@
         <table class="table"><thead><tr><th>Học sinh</th><th>Thẻ</th><th>Kết quả</th><th>Ngày</th><th></th></tr></thead>
           <tbody>${history.map(h => `<tr data-grant="${h.grant_id}">
             <td>${esc(h.student_name)}</td><td>${esc(h.icon || '🃏')} ${esc(h.name)}</td>
-            <td>${h.status === 'used' ? '<span class="atp">Đã dùng</span>' : '<span class="muted">Hết hạn, tự xoá</span>'}</td>
+            <td>${RESULT[h.status] || ''}</td>
             <td class="muted">${dateText(h.used_at || h.expires_at)}</td>
-            <td class="row-actions">${h.status === 'used' ? '<button type="button" class="btn sm ghost" data-act="unuse">Hoàn tác</button>' : ''}</td>
+            <td class="row-actions">${h.status !== 'expired' ? '<button type="button" class="btn sm ghost" data-act="unuse">Hoàn tác</button>' : ''}</td>
           </tr>`).join('')}</tbody></table>
       </div>` : ''}` : ''}`;
 

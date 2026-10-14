@@ -9,8 +9,9 @@
   // Date có các trường UTC trùng với giờ UTC+7 của thời điểm `ms`
   const shifted = ms => new Date((ms == null ? Date.now() : ms) + OFFSET);
 
-  // 'YYYY-MM-DD' của hôm nay theo UTC+7
-  const today = () => shifted().toISOString().slice(0, 10);
+  // 'YYYY-MM-DD' theo UTC+7 của mốc `ms` (mặc định: bây giờ)
+  const dateOf = ms => shifted(ms).toISOString().slice(0, 10);
+  const today = () => dateOf();
 
   function parts(ms) {
     const d = shifted(ms);
@@ -28,7 +29,7 @@
 
   // Hiển thị dd/mm/yyyy
   const fmtDate = dateStr => dateStr.split('-').reverse().join('/');
-  const fmt = ms => fmtDate(shifted(ms).toISOString().slice(0, 10));
+  const fmt = ms => fmtDate(dateOf(ms));
 
   function addYears(dateStr, n) {
     const [y, m, d] = dateStr.split('-').map(Number);
@@ -37,5 +38,5 @@
     return `${dt.getUTCFullYear()}-${pad(dt.getUTCMonth() + 1)}-${pad(dt.getUTCDate())}`;
   }
 
-  T.time = { DAY, today, parts, dayStart, dayIndex, toSql, fmt, fmtDate, addYears };
+  T.time = { DAY, today, dateOf, parts, dayStart, dayIndex, toSql, fmt, fmtDate, addYears };
 })(window.TSTB);

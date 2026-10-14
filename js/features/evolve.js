@@ -114,12 +114,16 @@
       cards = T.evolutions.heldBy(student.id);
       body.innerHTML = cards.length
         ? `<p class="muted">Bấm vào một thẻ để sử dụng đặc quyền cho ${esc(student.name)}.
-            Thẻ không dùng được trong tuần vừa nhận.</p>
+            Thẻ không dùng được trong tuần vừa nhận. Dùng ✎ để sửa hạn hoặc đổi thẻ, 🗑 để xoá thẻ.</p>
           <div class="pcard-grid">${cards.map(c => {
             const locked = T.evolutions.sameWeek(c, when);
             return `<div class="card-pick ${locked ? 'locked' : ''}" data-grant="${c.grant_id}" role="button" tabindex="0">
               ${T.ui.cardHtml(c, { footer: `<span class="muted">${T.evolutions.expiryText(c)}</span>
-                ${locked ? '<span class="lock-tag">🔒 Dùng được từ tuần sau</span>' : '<span class="use-tag">Bấm để dùng</span>'}` })}
+                ${locked ? '<span class="lock-tag">🔒 Dùng được từ tuần sau</span>' : '<span class="use-tag">Bấm để dùng</span>'}
+                <span class="card-tools">
+                  <button type="button" class="btn sm ghost" data-tool="edit" title="Sửa hạn / đổi thẻ">✎ Sửa</button>
+                  <button type="button" class="btn sm ghost" data-tool="remove" title="Xoá thẻ">🗑 Xoá</button>
+                </span>` })}
             </div>`;
           }).join('')}</div>`
         : T.ui.empty('🃏', 'Chưa có thẻ nào', `${student.name} chưa giữ thẻ tiến hoá nào.`);
@@ -138,9 +142,53 @@
       draw();
     }
 
+    // Sửa một lá đang giữ: đổi sang loại thẻ khác và / hoặc đặt lại ngày hết hạn
+    async function edit(c) {
+      const before = c.expires_at ? T.time.dateOf(c.expires_at) : '';
+      const options = [c].concat(T.evolutions.available(student.id))
+        .map(k => ({ value: k.id, label: `${k.icon || '🃏'} ${k.name}` }));
+      const out = await T.ui.form(`Sửa thẻ của ${student.name}`, [
+        { name: 'card', label: 'Loại thẻ', type: 'select', value: c.id, options,
+          hint: 'Chỉ đổi được sang loại thẻ em chưa giữ. Lượt lật và tuần nhận thẻ giữ nguyên.' },
+        { name: 'expires', label: 'Hết hạn vào cuối ngày', type: 'date', value: before, min: T.time.today(),
+          hint: 'Để trống = không hết hạn. Nếu đổi loại thẻ mà không sửa ngày, hạn tính lại theo thẻ mới kể từ hôm nay.' }
+      ]);
+      if (!out) return;
+      const cardId = Number(out.card);
+      const swapped = cardId !== c.id;
+      if (swapped && !T.evolutions.swap(c.grant_id, cardId)) {
+        T.ui.toast('Không đổi được: học sinh đang giữ một lá cùng loại', 'warn');
+        return draw();
+      }
+      if (out.expires !== before && !T.evolutions.setExpiry(c.grant_id, out.expires)) {
+        T.ui.toast('Ngày hết hạn không hợp lệ hoặc đã qua', 'warn');
+        return draw();
+      }
+      if (swapped || out.expires !== before) T.ui.toast(`Đã cập nhật thẻ của ${student.name}`);
+      draw();
+    }
+
+    async function remove(c) {
+      const out = await T.ui.form(`Xoá thẻ “${c.name}” của ${student.name}`, [
+        { name: 'mode', label: 'Lượt lật thẻ', type: 'select', value: 'revoke', options: [
+          { value: 'revoke', label: 'Trả lại lượt lật – em được lật thẻ khác' },
+          { value: 'discard', label: 'Không trả lại lượt lật' }
+        ], hint: 'Xoá mà không trả lượt lật thì vẫn hoàn tác được trong Lịch sử thẻ.' }
+      ], { okLabel: 'Xoá thẻ' });
+      if (!out) return;
+      if (out.mode === 'discard') T.evolutions.discard(c.grant_id);
+      else T.evolutions.revoke(c.grant_id);
+      T.ui.toast(`Đã xoá thẻ ${c.name} của ${student.name}`);
+      draw();
+    }
+
     body.addEventListener('click', e => {
       const el = e.target.closest('[data-grant]');
-      if (el) use(el);
+      if (!el) return;
+      const tool = e.target.closest('[data-tool]');
+      if (!tool) return use(el);
+      const c = cards.find(x => x.grant_id === Number(el.dataset.grant));
+      if (tool.dataset.tool === 'edit') edit(c); else remove(c);
     });
     draw();
     T.ui.modal({ title: `🃏 Thẻ của ${student.name}`, body, wide: true, onClose: done });
