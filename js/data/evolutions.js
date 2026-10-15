@@ -96,10 +96,10 @@
     return T.db.query(`
       SELECT s.id, s.name,
         COALESCE((SELECT SUM(amount) FROM atp_events e
-          WHERE e.student_id = s.id AND e.created_at >= ? AND e.created_at < ?), 0) AS total,
+          WHERE e.student_id = s.id AND e.created_ms >= ? AND e.created_ms < ?), 0) AS total,
         (SELECT COUNT(*) FROM student_cards v
           WHERE v.student_id = s.id AND v.granted_at >= ? AND v.granted_at < ?) AS flips
-      FROM students s ORDER BY s.class_id, s.sort_order, s.id`, [r.startSql, r.endSql, r.startMs, r.endMs]);
+      FROM students s ORDER BY s.class_id, s.sort_order, s.id`, [r.startMs, r.endMs, r.startMs, r.endMs]);
   }
 
   // Đổi mốc ATP thì lượt lật cả năm được tính lại. Trả về:

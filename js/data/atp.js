@@ -18,11 +18,12 @@
     if (!lesson) throw new Error('Không tìm thấy tiết học');
     const amount = opts.amount != null ? opts.amount : amountFor(type);
     if (!Number.isInteger(amount)) throw new Error('Số ATP phải là số nguyên');
-    const batch = Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+    const now = Date.now();
+    const batch = now + '-' + Math.random().toString(36).slice(2, 8);
     T.db.tx(() => studentIds.forEach(sid => T.db.run(
-      `INSERT INTO atp_events (student_id, class_id, lesson_id, type, amount, group_id, batch_id, note)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [sid, lesson.class_id, lessonId, type, amount, opts.groupId || null, batch, opts.note || null])));
+      `INSERT INTO atp_events (student_id, class_id, lesson_id, type, amount, group_id, batch_id, note, created_ms)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [sid, lesson.class_id, lessonId, type, amount, opts.groupId || null, batch, opts.note || null, now])));
     return amount;
   }
 
@@ -37,15 +38,15 @@
     const r = T.schoolYear.range();
     return toMap(T.db.query(`
       SELECT student_id, SUM(amount) AS total FROM atp_events
-      WHERE class_id = ? AND created_at >= ? AND created_at < ? GROUP BY student_id`,
-      [classId, r.startSql, r.endSql]));
+      WHERE class_id = ? AND created_ms >= ? AND created_ms < ? GROUP BY student_id`,
+      [classId, r.startMs, r.endMs]));
   }
 
   function totalFor(studentId) {
     const r = T.schoolYear.range();
     return T.db.scalar(`
       SELECT COALESCE(SUM(amount), 0) FROM atp_events
-      WHERE student_id = ? AND created_at >= ? AND created_at < ?`, [studentId, r.startSql, r.endSql]);
+      WHERE student_id = ? AND created_ms >= ? AND created_ms < ?`, [studentId, r.startMs, r.endMs]);
   }
 
   const totalsByLesson = lessonId => toMap(T.db.query(
@@ -73,8 +74,8 @@
     const r = T.schoolYear.range();
     const deltas = {};
     T.db.query(`SELECT student_id, SUM(amount) AS s FROM atp_events
-      WHERE id IN (${eventIds.map(() => '?').join(',')}) AND created_at >= ? AND created_at < ? GROUP BY student_id`,
-    [...eventIds, r.startSql, r.endSql]).forEach(row => { deltas[row.student_id] = -row.s; });
+      WHERE id IN (${eventIds.map(() => '?').join(',')}) AND created_ms >= ? AND created_ms < ? GROUP BY student_id`,
+    [...eventIds, r.startMs, r.endMs]).forEach(row => { deltas[row.student_id] = -row.s; });
     return T.evolutions.overdrawnIf(deltas);
   }
 

@@ -82,9 +82,10 @@ function freeze(t, iso) {
   t.mock.timers.enable({ apis: ['Date'], now: Date.parse(iso) });
 }
 
-// Đặt lại thời điểm ghi của mọi lượt cộng ATP (chuỗi UTC 'YYYY-MM-DD HH:MM:SS')
+// Đặt lại thời điểm ghi của mọi lượt cộng ATP (chuỗi UTC 'YYYY-MM-DD HH:MM:SS'); ghi cả created_ms
 function stampEvents(T, sqlUtc, where) {
-  T.db.run(`UPDATE atp_events SET created_at = ? ${where ? 'WHERE ' + where : ''}`, [sqlUtc]);
+  T.db.run(`UPDATE atp_events SET created_at = ?, created_ms = CAST(strftime('%s', ?) AS INTEGER) * 1000
+    ${where ? 'WHERE ' + where : ''}`, [sqlUtc, sqlUtc]);
 }
 
 // Kho lưu giả thay IndexedDB; fails = số lần ghi dữ liệu chính tiếp theo sẽ lỗi.

@@ -25,8 +25,8 @@
     if (f.studentId) { w.push('e.student_id = ?'); p.push(Number(f.studentId)); }
     if (f.scope === 'school') {
       const r = T.schoolYear.range();
-      w.push('e.created_at >= ? AND e.created_at < ?');
-      p.push(r.startSql, r.endSql);
+      w.push('e.created_ms >= ? AND e.created_ms < ?');
+      p.push(r.startMs, r.endMs);
     }
     return { sql: w.length ? 'WHERE ' + w.join(' AND ') : '', params: p };
   }

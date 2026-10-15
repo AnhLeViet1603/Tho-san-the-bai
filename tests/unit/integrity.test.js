@@ -41,10 +41,10 @@ test('xoá lớp bằng SQL: phát hiện cả chuỗi học sinh, tiết, ATP',
 
 test('giá trị lạ: loại ATP không xác định, ATP không phải số nguyên, trạng thái thẻ lạ', async () => {
   const { T, ids, classId, lesson } = await setup();
-  const ins = 'INSERT INTO atp_events (student_id, class_id, lesson_id, type, amount) VALUES (?, ?, ?, ?, ?)';
-  T.db.run(ins, [ids[1], classId, lesson.id, 'bonus_tuong_lai', 2]);
-  T.db.run(ins, [ids[1], classId, lesson.id, 'manual', 1.5]);
-  T.db.run(ins, [ids[1], classId, lesson.id, 'manual', 'abc']);
+  const ins = 'INSERT INTO atp_events (student_id, class_id, lesson_id, type, amount, created_ms) VALUES (?, ?, ?, ?, ?, ?)';
+  T.db.run(ins, [ids[1], classId, lesson.id, 'bonus_tuong_lai', 2, Date.now()]);
+  T.db.run(ins, [ids[1], classId, lesson.id, 'manual', 1.5, Date.now()]);
+  T.db.run(ins, [ids[1], classId, lesson.id, 'manual', 'abc', Date.now()]);
   T.db.run("UPDATE student_cards SET status = 'lost'");
   assert.deepEqual(counts(T.integrity.check()), { atp_type: 1, atp_amount: 2, card_status: 1 });
 });
@@ -52,8 +52,8 @@ test('giá trị lạ: loại ATP không xác định, ATP không phải số ng
 test('sửa: xoá mồ côi theo dây chuyền, đưa giá trị lạ về mặc định, dữ liệu tốt giữ nguyên', async () => {
   const { T, ids, classId, lesson } = await setup();
   T.db.run('DELETE FROM students WHERE id = ?', [ids[0]]);
-  T.db.run('INSERT INTO atp_events (student_id, class_id, lesson_id, type, amount) VALUES (?, ?, ?, ?, ?)',
-    [ids[1], classId, lesson.id, 'bonus_tuong_lai', 2]);
+  T.db.run('INSERT INTO atp_events (student_id, class_id, lesson_id, type, amount, created_ms) VALUES (?, ?, ?, ?, ?, ?)',
+    [ids[1], classId, lesson.id, 'bonus_tuong_lai', 2, Date.now()]);
   T.evolutions.grant(ids[1], T.cards.list()[1], { year: 2026, month: 10, week: 1 });
   T.db.run("UPDATE student_cards SET status = 'lost' WHERE student_id = ?", [ids[1]]);
 
@@ -63,6 +63,16 @@ test('sửa: xoá mồ côi theo dây chuyền, đưa giá trị lạ về mặc
   assert.equal(T.atp.totalFor(ids[1]), 1 + 2, 'lượt loại lạ được giữ, chuyển thành Thủ công');
   assert.equal(T.atp.totalFor(ids[2]), 1);
   assert.equal(T.db.scalar('SELECT status FROM student_cards WHERE student_id = ?', [ids[1]]), 'removed');
+});
+
+test('lượt ATP thiếu created_ms (ghi bằng đường khác): phát hiện và lấy lại từ created_at', async () => {
+  const { T, ids, classId, lesson } = await setup();
+  T.db.run("INSERT INTO atp_events (student_id, class_id, lesson_id, type, amount, created_at) VALUES (?, ?, ?, 'manual', 5, ?)",
+    [ids[1], classId, lesson.id, T.time.toSql(Date.now())]);
+  assert.deepEqual(counts(T.integrity.check()), { atp_time: 1 });
+  assert.equal(T.atp.totalFor(ids[1]), 1, 'chưa sửa thì chưa được tính vào năm học');
+  await T.integrity.repair();
+  assert.equal(T.atp.totalFor(ids[1]), 1 + 5);
 });
 
 test('sửa: nhóm mồ côi kéo theo thành viên nhóm (lặp nhiều lượt)', async () => {

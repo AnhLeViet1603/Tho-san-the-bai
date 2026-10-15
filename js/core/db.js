@@ -259,6 +259,17 @@
       if (!query('PRAGMA table_info(cards)').some(c => c.name === 'archived')) {
         d.run('ALTER TABLE cards ADD COLUMN archived INTEGER NOT NULL DEFAULT 0');
       }
+    },
+
+    // 3: thời điểm ghi ATP lưu bằng mili giây như các bảng khác (created_at là chuỗi UTC của SQLite, chỉ tới giây),
+    // để ranh giới năm học được so một cách duy nhất. created_at giữ lại cho dữ liệu cũ.
+    d => {
+      if (!query('PRAGMA table_info(atp_events)').some(c => c.name === 'created_ms')) {
+        d.run('ALTER TABLE atp_events ADD COLUMN created_ms INTEGER');
+      }
+      d.run(`UPDATE atp_events SET created_ms = CAST(strftime('%s', created_at) AS INTEGER) * 1000
+        WHERE created_ms IS NULL`);
+      d.run('CREATE INDEX IF NOT EXISTS idx_events_class_time ON atp_events (class_id, created_ms)');
     }
   ];
 
