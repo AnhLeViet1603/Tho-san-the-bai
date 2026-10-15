@@ -270,6 +270,17 @@
       d.run(`UPDATE atp_events SET created_ms = CAST(strftime('%s', created_at) AS INTEGER) * 1000
         WHERE created_ms IS NULL`);
       d.run('CREATE INDEX IF NOT EXISTS idx_events_class_time ON atp_events (class_id, created_ms)');
+    },
+
+    // 4: thùng rác cho lớp (archived_at: lúc chuyển vào thùng rác) và nhật ký thao tác
+    d => {
+      if (!query('PRAGMA table_info(classes)').some(c => c.name === 'archived_at')) {
+        d.run('ALTER TABLE classes ADD COLUMN archived_at INTEGER');
+      }
+      d.run(`CREATE TABLE IF NOT EXISTS audit_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        at INTEGER NOT NULL, action TEXT NOT NULL, summary TEXT NOT NULL, data TEXT)`);
+      d.run('CREATE INDEX IF NOT EXISTS idx_audit_at ON audit_log (at)');
     }
   ];
 

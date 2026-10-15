@@ -142,7 +142,21 @@ await group('2. Cài đặt: lớp học', async () => {
   check('xoá lớp phải xác nhận', await count('.confirm-msg') === 1);
   await modalOk();
   await sleep(200);
-  check('lớp bị xoá sau khi xác nhận', await count('#setBody tbody tr') === 1);
+  check('xoá lớp: chuyển vào thùng rác, bảng lớp còn 1 dòng', await count('#setBody table:not(.trash-table) tbody tr') === 1);
+  check('lớp nằm trong Thùng rác', /11B2/.test(await text('.trash-table')));
+  await click('.trash-table [data-act="restore-class"]');
+  await sleep(200);
+  check('khôi phục từ thùng rác: lớp trở lại, thùng rác trống', await count('#setBody table:not(.trash-table) tbody tr') === 2 && await count('.trash-table') === 0);
+  await ev(`[...document.querySelectorAll('#setBody tbody tr')].find(tr => /11B2/.test(tr.innerText)).querySelector('[data-act="del"]').click()`);
+  await sleep(150);
+  await modalOk();
+  await sleep(200);
+  await click('.trash-table [data-act="purge-class"]');
+  await sleep(150);
+  check('xoá vĩnh viễn phải xác nhận', /VĨNH VIỄN/.test(await text('.confirm-msg')));
+  await modalOk();
+  await sleep(200);
+  check('xoá vĩnh viễn: lớp mất hẳn', await count('.trash-table') === 0 && await ev("TSTB.db.scalar(\"SELECT COUNT(*) FROM classes WHERE name = '11B2'\")") === 0);
 });
 
 await group('3. Cài đặt: học sinh + Import Excel', async () => {
@@ -492,6 +506,10 @@ await group('12. Xoá toàn bộ dữ liệu', async () => {
   await click('[data-tab="data"]');
   await sleep(200);
   check('dữ liệu sạch thì không hiện khung báo lỗi', await count('.integrity-box') === 0);
+  const audit = await text('.audit-table');
+  check('Nhật ký thao tác ghi lại các thao tác ở trên', /Chuyển lớp 11B2 vào thùng rác/.test(audit) &&
+    /Xoá vĩnh viễn lớp 11B2/.test(audit) && /Hoàn tác lượt cộng/.test(audit), audit.slice(0, 400));
+  await shot('12-nhat-ky');
   await go('cai-dat');
   await click('[data-tab="data"]');
   await sleep(200);

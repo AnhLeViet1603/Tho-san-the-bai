@@ -6,7 +6,7 @@
     FROM atp_events e
     JOIN lessons l ON l.id = e.lesson_id
     JOIN students s ON s.id = e.student_id
-    JOIN classes c ON c.id = e.class_id`;
+    JOIN classes c ON c.id = e.class_id AND c.archived_at IS NULL`;
 
   // filter: { classIds[], scope ('school' = năm học hiện tại), year, month, week, period, type, source, studentId }
   function where(f) {
@@ -73,7 +73,7 @@
 
   // Số lượt lật theo từng loại thẻ (lọc theo lớp, năm, học sinh)
   function evolution(f) {
-    const w = ['1 = 1'];
+    const w = ['s.class_id IN (SELECT id FROM classes WHERE archived_at IS NULL)'];
     const p = [];
     if (f.classIds && f.classIds.length) {
       w.push(`s.class_id IN (${f.classIds.map(() => '?').join(',')})`);

@@ -52,14 +52,25 @@
   const totalsByLesson = lessonId => toMap(T.db.query(
     'SELECT student_id, SUM(amount) AS total FROM atp_events WHERE lesson_id = ? GROUP BY student_id', [lessonId]));
 
-  // Xoá lượt cộng gần nhất của tiết; trả về số sự kiện đã xoá
-  function undoLast(lessonId) {
-    const last = T.db.get('SELECT id, batch_id FROM atp_events WHERE lesson_id = ? ORDER BY id DESC LIMIT 1', [lessonId]);
-    if (!last) return 0;
-    const n = T.db.scalar('SELECT COUNT(*) FROM atp_events WHERE lesson_id = ? AND batch_id = ?', [lessonId, last.batch_id]);
-    T.db.run('DELETE FROM atp_events WHERE lesson_id = ? AND batch_id = ?', [lessonId, last.batch_id]);
-    return n;
+  // Xoá các sự kiện và ghi nhật ký kèm nội dung đã xoá (đủ để nhập lại tay nếu cần)
+  function removeLogged(ids, action, what) {
+    if (!ids.length) return 0;
+    const rows = T.db.query(`SELECT e.*, s.name AS student_name FROM atp_events e
+      LEFT JOIN students s ON s.id = e.student_id WHERE e.id IN (${ids.map(() => '?').join(',')}) ORDER BY e.id`, ids);
+    if (!rows.length) return 0;
+    const sum = rows.reduce((a, r) => a + r.amount, 0);
+    const who = rows.length === 1 ? rows[0].student_name : `${rows.length} học sinh`;
+    const type = TYPES[rows[0].type] ? TYPES[rows[0].type].label : rows[0].type;
+    T.db.tx(() => {
+      T.audit.log(action, `${what}: ${type} ${rows[0].amount > 0 ? '+' : ''}${rows[0].amount} ATP · ${who}` +
+        (rows.length > 1 ? ` (tổng ${sum})` : ''), { events: rows });
+      T.db.run(`DELETE FROM atp_events WHERE id IN (${rows.map(() => '?').join(',')})`, rows.map(r => r.id));
+    });
+    return rows.length;
   }
+
+  // Xoá lượt cộng gần nhất của tiết; trả về số sự kiện đã xoá
+  const undoLast = lessonId => removeLogged(lastBatchIds(lessonId), 'atp.undo', 'Hoàn tác lượt cộng');
 
   // Id các sự kiện của lượt cộng gần nhất trong tiết (lượt mà undoLast sẽ xoá)
   function lastBatchIds(lessonId) {
@@ -86,7 +97,7 @@
     LEFT JOIN groups g ON g.id = e.group_id
     WHERE e.lesson_id = ? ORDER BY e.id DESC`, [lessonId]);
 
-  const removeEvent = id => T.db.run('DELETE FROM atp_events WHERE id = ?', [id]);
+  const removeEvent = id => removeLogged([id], 'atp.remove', 'Xoá lượt cộng trong Lịch sử');
 
   T.atp = {
     TYPES, amountFor, award, totalsByClass, totalFor, totalsByLesson, undoLast, lastBatchIds, removalImpact, history, removeEvent

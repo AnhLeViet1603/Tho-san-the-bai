@@ -21,7 +21,11 @@
   const setActive = (id, active) => T.db.run('UPDATE students SET active = ? WHERE id = ?', [active ? 1 : 0, id]);
 
   function remove(id) {
+    const s = T.db.get('SELECT * FROM students WHERE id = ?', [id]);
+    if (!s) return;
     T.db.tx(() => {
+      T.audit.log('student.delete', `Xoá học sinh ${s.name} (${T.atp.totalFor(id)} ATP năm học, ` +
+        `${T.db.scalar('SELECT COUNT(*) FROM student_cards WHERE student_id = ?', [id])} lượt lật thẻ)`, { student: s });
       T.db.run('DELETE FROM student_cards WHERE student_id = ?', [id]);
       T.db.run('DELETE FROM group_members WHERE student_id = ?', [id]);
       T.db.run('DELETE FROM atp_events WHERE student_id = ?', [id]);
@@ -30,7 +34,11 @@
   }
 
   function removeAll(classId) {
+    const c = T.classes.get(classId);
+    const n = T.db.scalar('SELECT COUNT(*) FROM students WHERE class_id = ?', [classId]);
+    if (!n) return;
     T.db.tx(() => {
+      T.audit.log('student.delete_all', `Xoá toàn bộ ${n} học sinh của lớp ${c ? c.name : classId}`, { classId, count: n });
       const sub = '(SELECT id FROM students WHERE class_id = ?)';
       T.db.run(`DELETE FROM student_cards WHERE student_id IN ${sub}`, [classId]);
       T.db.run(`DELETE FROM group_members WHERE student_id IN ${sub}`, [classId]);

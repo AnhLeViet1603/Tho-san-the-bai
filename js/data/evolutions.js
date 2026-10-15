@@ -99,7 +99,8 @@
           WHERE e.student_id = s.id AND e.created_ms >= ? AND e.created_ms < ?), 0) AS total,
         (SELECT COUNT(*) FROM student_cards v
           WHERE v.student_id = s.id AND v.granted_at >= ? AND v.granted_at < ?) AS flips
-      FROM students s ORDER BY s.class_id, s.sort_order, s.id`, [r.startMs, r.endMs, r.startMs, r.endMs]);
+      FROM students s WHERE s.class_id IN (SELECT id FROM classes WHERE archived_at IS NULL)
+      ORDER BY s.class_id, s.sort_order, s.id`, [r.startMs, r.endMs, r.startMs, r.endMs]);
   }
 
   // Đổi mốc ATP thì lượt lật cả năm được tính lại. Trả về:
@@ -131,6 +132,13 @@
   // Không được dùng thẻ ngay trong tuần nhận thẻ
   const sameWeek = (row, when) => row.year === when.year && row.month === when.month && row.week === when.week;
 
+  // Ghi nhật ký cho một thao tác trên lá thẻ: "<việc> thẻ <tên thẻ> của <học sinh>"
+  function logCard(action, verb, grantId, extra) {
+    const r = T.db.get(`SELECT v.*, k.name AS card_name, s.name AS student_name FROM student_cards v
+      LEFT JOIN cards k ON k.id = v.card_id LEFT JOIN students s ON s.id = v.student_id WHERE v.id = ?`, [grantId]);
+    if (r) T.audit.log(action, `${verb} ${T.cards.named(r.card_name)} của ${r.student_name}${extra ? ' ' + extra : ''}`, { grant: r });
+  }
+
   const use = (grantId, lessonId) => T.db.run(
     "UPDATE student_cards SET status = 'used', used_at = ?, lesson_id = ? WHERE id = ? AND status = 'held'",
     [Date.now(), lessonId || null, grantId]);
@@ -142,16 +150,25 @@
     if (!row || holds(row.student_id, row.card_id)) return false;
     const card = T.cards.get(row.card_id);
     if (!card || card.archived) return false;
-    T.db.run("UPDATE student_cards SET status = 'held', used_at = NULL, lesson_id = NULL WHERE id = ?", [grantId]);
+    T.db.tx(() => {
+      logCard('card.unuse', 'Hoàn tác', grantId, row.status === 'used' ? '(đã dùng → đang giữ)' : '(→ đang giữ)');
+      T.db.run("UPDATE student_cards SET status = 'held', used_at = NULL, lesson_id = NULL WHERE id = ?", [grantId]);
+    });
     return true;
   }
 
   // Thu hồi: xoá hẳn lượt lật, học sinh được lật lại
-  const revoke = grantId => T.db.run('DELETE FROM student_cards WHERE id = ?', [grantId]);
+  const revoke = grantId => T.db.tx(() => {
+    logCard('card.revoke', 'Xoá', grantId, '(trả lại lượt lật)');
+    T.db.run('DELETE FROM student_cards WHERE id = ?', [grantId]);
+  });
 
   // Giáo viên xoá thẻ nhưng không trả lại lượt lật; vẫn nằm trong lịch sử để hoàn tác
-  const discard = grantId => T.db.run(
-    "UPDATE student_cards SET status = 'removed', used_at = ? WHERE id = ? AND status = 'held'", [Date.now(), grantId]);
+  const discard = grantId => T.db.tx(() => {
+    if (!heldRow(grantId)) return;
+    logCard('card.discard', 'Xoá', grantId, '(không trả lượt lật)');
+    T.db.run("UPDATE student_cards SET status = 'removed', used_at = ? WHERE id = ? AND status = 'held'", [Date.now(), grantId]);
+  });
 
   const heldRow = grantId => T.db.get("SELECT * FROM student_cards WHERE id = ? AND status = 'held'", [grantId]);
 
@@ -164,7 +181,10 @@
       if (!(expires >= Date.now())) return false;
     }
     if (!heldRow(grantId)) return false;
-    T.db.run('UPDATE student_cards SET expires_at = ? WHERE id = ?', [expires, grantId]);
+    T.db.tx(() => {
+      logCard('card.expiry', 'Sửa hạn', grantId, `thành ${expires ? T.time.fmt(expires) : 'không hết hạn'}`);
+      T.db.run('UPDATE student_cards SET expires_at = ? WHERE id = ?', [expires, grantId]);
+    });
     return true;
   }
 
@@ -174,7 +194,10 @@
     const row = heldRow(grantId);
     const card = T.cards.get(cardId);
     if (!row || !card || card.archived || row.card_id === card.id || holds(row.student_id, card.id)) return false;
-    T.db.run('UPDATE student_cards SET card_id = ?, expires_at = ? WHERE id = ?', [card.id, expiryFor(card), grantId]);
+    T.db.tx(() => {
+      logCard('card.swap', 'Đổi', grantId, `sang ${T.cards.named(card.name)}`);
+      T.db.run('UPDATE student_cards SET card_id = ?, expires_at = ? WHERE id = ?', [card.id, expiryFor(card), grantId]);
+    });
     return true;
   }
 

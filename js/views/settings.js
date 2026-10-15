@@ -30,6 +30,7 @@
   function tabClasses(body) {
     const year = T.schoolYear.range().label;
     const classes = T.classes.list();
+    const trash = T.classes.trash();
     body.innerHTML = `
       <div class="panel-head"><h2>Lớp học</h2><button type="button" class="btn" data-act="add">＋ Thêm lớp</button></div>
       ${classes.length ? `<table class="table"><thead><tr><th></th><th>Tên lớp</th><th>Sĩ số</th><th>ATP ${year}</th><th>Ghi chú</th><th></th></tr></thead>
@@ -44,13 +45,34 @@
             <button type="button" class="btn sm ghost" data-act="edit">Sửa</button>
             <button type="button" class="btn sm danger" data-act="del">Xoá</button>
           </td></tr>`).join('')}</tbody></table>`
-      : T.ui.empty('🌱', 'Chưa có lớp nào', 'Bấm “Thêm lớp” để gieo hạt giống đầu tiên.')}`;
+      : T.ui.empty('🌱', 'Chưa có lớp nào', 'Bấm “Thêm lớp” để gieo hạt giống đầu tiên.')}
+      ${trash.length ? `<h2>🗑 Thùng rác</h2>
+        <p class="muted">Lớp trong thùng rác không hiện ở đâu cả (kể cả Thống kê) nhưng dữ liệu còn nguyên. Khôi phục để dùng lại.</p>
+        <table class="table trash-table"><thead><tr><th>Lớp</th><th>Sĩ số</th><th>Xoá lúc</th><th></th></tr></thead>
+        <tbody>${trash.map(c => `<tr>
+          <td>${esc(c.icon || '🌿')} <b>${esc(c.name)}</b></td><td>${c.student_count}</td><td>${T.time.fmt(c.archived_at)}</td>
+          <td class="row-actions">
+            <button type="button" class="btn sm ghost" data-act="restore-class" data-cid="${c.id}">↺ Khôi phục</button>
+            <button type="button" class="btn sm danger" data-act="purge-class" data-cid="${c.id}">Xoá vĩnh viễn</button>
+          </td></tr>`).join('')}</tbody></table>` : ''}`;
 
     body.onclick = async e => {
       const btn = e.target.closest('[data-act]');
       if (!btn) return;
       const act = btn.dataset.act;
       if (act === 'add') return classForm(null);
+      if (act === 'restore-class') {
+        T.classes.restore(Number(btn.dataset.cid));
+        T.ui.toast('Đã khôi phục lớp');
+        return refresh();
+      }
+      if (act === 'purge-class') {
+        const t = trash.find(x => x.id === Number(btn.dataset.cid));
+        if (!(await T.ui.confirm(`Xoá VĨNH VIỄN lớp ${t.name}? Toàn bộ ${t.student_count} học sinh, tiết học, ATP và thẻ của lớp sẽ mất hẳn.`,
+          { danger: true, okLabel: 'Xoá vĩnh viễn' }))) return;
+        T.classes.remove(t.id);
+        return refresh();
+      }
       const id = Number(btn.closest('tr').dataset.id);
       const c = classes.find(x => x.id === id);
       if (act === 'edit') return classForm(c);
@@ -58,9 +80,9 @@
       if (act === 'students') { T.store.set({ classId: id }); tab = 'students'; }
       if (act === 'del') {
         if (!(await T.ui.confirm(
-          `Xoá lớp ${c.name}? Toàn bộ ${c.student_count} học sinh, tiết học và ATP của lớp sẽ bị xoá vĩnh viễn.`,
-          { danger: true, okLabel: 'Xoá lớp' }))) return;
-        T.classes.remove(id);
+          `Chuyển lớp ${c.name} vào thùng rác? Lớp sẽ ẩn khỏi mọi màn hình; dữ liệu còn nguyên và khôi phục được ở cuối trang này.`,
+          { danger: true, okLabel: 'Chuyển vào thùng rác' }))) return;
+        T.classes.archive(id);
       }
       refresh();
     };
@@ -189,12 +211,24 @@
           `Đổi mốc ATP từ ${T.evolutions.threshold()} thành ${nextThreshold} sẽ tính lại lượt lật cho cả năm học: ${parts.join('; ')}. Vẫn lưu?`,
           { title: 'Đổi mốc ATP tiến hoá', okLabel: 'Vẫn lưu' }))) return;
       }
+      const LOGGED = { atp_speak: 'ATP phát biểu', atp_score_8_9: 'ATP điểm 8–9', atp_score_9_plus: 'ATP điểm 9+',
+        evolve_threshold: 'Mốc ATP tiến hoá', evolve_choices: 'Số thẻ úp', school_start: 'Bắt đầu năm học', school_end: 'Kết thúc năm học' };
+      const snapshot = () => Object.assign(
+        Object.fromEntries(Object.keys(LOGGED).filter(k => !k.startsWith('school_')).map(k => [k, T.settings.get(k)])),
+        { school_start: T.schoolYear.get().start, school_end: T.schoolYear.get().end });
+      const before = snapshot();
       T.db.tx(() => {
         T.schoolYear.set(els.school_start.value, els.school_end.value);
         ['atp_speak', 'atp_score_8_9', 'atp_score_9_plus'].forEach(k => T.settings.set(k, Math.trunc(Number(els[k].value) || 0)));
         ['evolve_threshold', 'evolve_choices'].forEach(k => T.settings.set(k, Math.max(1, Math.trunc(Number(els[k].value) || 1))));
         T.settings.set('excel_name_column', els.excel_name_column.value.trim().toUpperCase());
         T.settings.set('excel_header_rows', Math.max(0, Math.trunc(Number(els.excel_header_rows.value) || 0)));
+        const after = snapshot();
+        const changed = Object.keys(LOGGED).filter(k => String(before[k]) !== String(after[k]));
+        if (changed.length) {
+          T.audit.log('settings', 'Đổi cài đặt: ' + changed.map(k => `${LOGGED[k]} ${before[k]} → ${after[k]}`).join(', '),
+            { before, after });
+        }
       });
       T.ui.toast('Đã lưu cài đặt');
       refresh();
@@ -279,6 +313,9 @@
         Bản chụp nằm cùng chỗ với dữ liệu trong trình duyệt nên <b>không thay được file sao lưu</b>: xoá dữ liệu trình duyệt là mất cả hai.</p>
       <div id="snapList"><p class="muted">Đang đọc…</p></div>
       <p class="muted" id="usageNote"></p>
+      <h2>Nhật ký thao tác</h2>
+      <p class="muted">Các lần xoá, sửa, hoàn tác và đổi cài đặt gần đây — để tra lại khi có thắc mắc về điểm hay thẻ.</p>
+      ${auditHtml()}
       <h2>Vùng nguy hiểm</h2>
       <p class="muted">Xoá sạch mọi lớp, học sinh, ATP và thẻ bài, đưa ứng dụng về trạng thái ban đầu. Có thể lùi lại bằng bản chụp “Trước khi xoá toàn bộ”.</p>
       <button type="button" class="btn danger" data-act="reset">Xoá toàn bộ dữ liệu</button>`;
@@ -299,6 +336,7 @@
         { danger: true, okLabel: 'Nhập và thay thế' }))) { e.target.value = ''; return; }
       try {
         await T.backup.importFile(file);
+        T.audit.log('data.import', `Nhập file ${file.name} (thay toàn bộ dữ liệu)`);
         T.ui.toast('Đã khôi phục dữ liệu');
       } catch (err) {
         T.ui.toast(err.message || 'Không nhập được file', 'error');
@@ -315,6 +353,7 @@
       if (!(await T.ui.confirm('Xác nhận lần cuối: bạn đã sao lưu hoặc chắc chắn muốn xoá hết?', { danger: true, okLabel: 'Xoá hết' }))) return;
       try {
         await T.db.reset();
+        T.audit.log('data.reset', 'Xoá toàn bộ dữ liệu');
         T.ui.toast('Đã xoá toàn bộ dữ liệu');
       } catch (err) {
         T.ui.toast(err.message || 'Không xoá được dữ liệu', 'error');
@@ -327,6 +366,7 @@
         { okLabel: 'Sửa dữ liệu' }))) return;
       try {
         const n = await T.integrity.repair();
+        T.audit.log('data.repair', `Sửa ${n} bản ghi lỗi`);
         T.ui.toast(`Đã sửa ${n} bản ghi`);
       } catch (err) {
         T.ui.toast(err.message || 'Không sửa được dữ liệu', 'error');
@@ -339,12 +379,20 @@
         { danger: true, okLabel: 'Khôi phục' }))) return;
       try {
         await T.db.restoreSnapshot(key);
+        T.audit.log('data.restore', `Khôi phục bản chụp ${label}`);
         T.ui.toast('Đã khôi phục bản chụp');
       } catch (err) {
         T.ui.toast(err.message || 'Không khôi phục được', 'error');
       }
       refresh();
     }
+  }
+
+  function auditHtml() {
+    const rows = T.audit.list(50);
+    if (!rows.length) return '<p class="muted">Chưa có thao tác nào.</p>';
+    return `<div class="audit-scroll"><table class="table audit-table"><thead><tr><th>Thời điểm</th><th>Thao tác</th></tr></thead>
+      <tbody>${rows.map(r => `<tr><td class="nowrap">${stamp(r.at)}</td><td>${esc(r.summary)}</td></tr>`).join('')}</tbody></table></div>`;
   }
 
   function renderIntegrity(body) {

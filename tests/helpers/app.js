@@ -17,6 +17,7 @@ const FILES = [
   'js/core/store.js',
   'js/core/router.js',
   'js/data/settings.js',
+  'js/data/audit.js',
   'js/data/schoolyear.js',
   'js/data/classes.js',
   'js/data/students.js',
