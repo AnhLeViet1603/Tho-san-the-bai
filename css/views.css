@@ -101,3 +101,6 @@
 .audit-scroll { max-height: 360px; overflow-y: auto; }
 .audit-table td { vertical-align: top; }
 .nowrap { white-space: nowrap; }
+
+/* Cài đặt → Dữ liệu: tự lưu ra file */
+.file-sink-warn { color: #ffd98a; }

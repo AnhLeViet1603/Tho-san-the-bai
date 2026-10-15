@@ -90,6 +90,7 @@
   let failures = 0;
   let status = 'saved'; // saved | pending | saving | error
   const listeners = [];
+  const savedListeners = []; // gọi sau mỗi lần ghi IndexedDB thành công (tự lưu ra file nối vào đây)
 
   function openIdb() {
     return new Promise((resolve, reject) => {
@@ -122,7 +123,7 @@
   function setStatus(next) {
     if (next === status) return;
     status = next;
-    listeners.forEach(fn => fn(next));
+    listeners.slice().forEach(fn => fn(next)); // bản sao: listener có thể tự huỷ đăng ký giữa chừng
   }
 
   const dirty = () => persist && version !== savedVersion;
@@ -145,6 +146,7 @@
       await saving;
       savedVersion = v;
       failures = 0;
+      savedListeners.slice().forEach(fn => { try { fn(); } catch (err) { console.error(err); } });
       setStatus(dirty() ? 'pending' : 'saved');
       if (dirty()) timer = setTimeout(flush, 300);
     } catch (err) {
@@ -483,6 +485,20 @@
     }
   }
 
+  // Kho key–value đang dùng (IndexedDB hoặc bản giả khi test) cho dữ liệu phụ, ví dụ file tự lưu đã chọn.
+  // Không dùng tiền tố 'snap:' (dành cho bản chụp) và key 'db.sqlite'.
+  const kv = {
+    get: key => storage.get(key),
+    set: (key, value) => storage.set(key, value),
+    del: key => storage.del(key)
+  };
+
+  // fn() sau mỗi lần ghi IndexedDB thành công; trả về hàm huỷ đăng ký
+  function onSaved(fn) {
+    savedListeners.push(fn);
+    return () => savedListeners.splice(savedListeners.indexOf(fn), 1);
+  }
+
   // Ngừng ghi vào IndexedDB (tab khác đã nhận quyền ghi). Thay đổi sau đó chỉ nằm trong bộ nhớ.
   function detach() {
     clearTimeout(timer);
@@ -493,7 +509,7 @@
 
   T.db = {
     init, run, query, get, scalar, insert, tx, flush, dirty, onStatus, detach, exportBytes, importBytes, reset,
-    listSnapshots, restoreSnapshot, guard, usage, SNAP_MAX, schemaVersion: latest, MIGRATIONS,
+    listSnapshots, restoreSnapshot, guard, usage, kv, onSaved, writable: () => persist, SNAP_MAX, schemaVersion: latest, MIGRATIONS,
     status: () => status
   };
 })(window.TSTB);

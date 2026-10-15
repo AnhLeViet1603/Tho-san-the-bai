@@ -14,6 +14,7 @@ const FILES = [
   'js/core/time.js',
   'js/core/db.js',
   'js/core/tab-lock.js',
+  'js/core/file-sink.js',
   'js/core/store.js',
   'js/core/router.js',
   'js/data/settings.js',

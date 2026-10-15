@@ -308,6 +308,8 @@
         <button type="button" class="btn" data-act="export">⬇ Xuất file .sqlite</button>
         <label class="btn ghost">⬆ Nhập file .sqlite<input type="file" id="importDb" accept=".sqlite,.db,.sqlite3" hidden></label>
       </div>
+      <h2>📁 Tự lưu ra file</h2>
+      <div id="fileSinkBox">${fileSinkHtml(T.fileSink.state())}</div>
       <h2>Bản chụp tự động</h2>
       <p class="muted">Ứng dụng tự chụp lại dữ liệu mỗi ngày và trước khi nhập file, xoá toàn bộ hay khôi phục; giữ ${T.db.SNAP_MAX} bản gần nhất.
         Bản chụp nằm cùng chỗ với dữ liệu trong trình duyệt nên <b>không thay được file sao lưu</b>: xoá dữ liệu trình duyệt là mất cả hai.</p>
@@ -329,6 +331,14 @@
     renderSnapshots(body);
     renderIntegrity(body);
 
+    // Cập nhật mục tự lưu khi trạng thái đổi (khởi động xong, xin lại quyền ở thanh bên…); rời trang thì thôi nghe
+    let offSink = null;
+    offSink = T.fileSink.onChange(s => {
+      const box = body.querySelector('#fileSinkBox');
+      if (!box || !box.isConnected) { if (offSink) offSink(); return; }
+      box.innerHTML = fileSinkHtml(s);
+    });
+
     body.querySelector('#importDb').onchange = async e => {
       const file = e.target.files[0];
       if (!file) return;
@@ -349,6 +359,7 @@
       if (btn.dataset.act === 'export') return T.backup.exportFile();
       if (btn.dataset.act === 'restore') return restore(btn.dataset.key, btn.dataset.label);
       if (btn.dataset.act === 'repair') return repair();
+      if (btn.dataset.act.startsWith('sink-')) return sinkAction(btn.dataset.act);
       if (!(await T.ui.confirm('Xoá TOÀN BỘ dữ liệu? Ứng dụng sẽ chụp lại dữ liệu hiện tại trước khi xoá.', { danger: true, okLabel: 'Tiếp tục' }))) return;
       if (!(await T.ui.confirm('Xác nhận lần cuối: bạn đã sao lưu hoặc chắc chắn muốn xoá hết?', { danger: true, okLabel: 'Xoá hết' }))) return;
       try {
@@ -360,6 +371,22 @@
       }
       refresh();
     };
+
+    async function sinkAction(act) {
+      try {
+        if (act === 'sink-pick' && await T.fileSink.pick()) T.ui.toast('Đã bật tự lưu ra file');
+        if (act === 'sink-now') { await T.fileSink.flush(true); T.ui.toast('Đã ghi ra file'); }
+        if (act === 'sink-resume' && await T.fileSink.resume()) T.ui.toast('Đã tiếp tục tự lưu ra file');
+        if (act === 'sink-off') {
+          if (!(await T.ui.confirm('Tắt tự lưu ra file? File đã ghi trên ổ đĩa vẫn giữ nguyên, chỉ là không được cập nhật nữa.',
+            { okLabel: 'Tắt' }))) return;
+          await T.fileSink.disable();
+        }
+      } catch (err) {
+        T.ui.toast(err.message || 'Không thực hiện được', 'error');
+      }
+      refresh();
+    }
 
     async function repair() {
       if (!(await T.ui.confirm('Xoá các bản ghi mồ côi và đưa giá trị lạ về mặc định? Dữ liệu hiện tại sẽ được chụp lại trước khi sửa.',
@@ -386,6 +413,39 @@
       }
       refresh();
     }
+  }
+
+  // Mục "Tự lưu ra file" theo trạng thái của T.fileSink
+  function fileSinkHtml(s) {
+    const tip = `<p class="muted">Nên đặt file trong thư mục <b>OneDrive / Google Drive</b> (có thêm bản trên mạng)
+      hoặc trên <b>USB</b>. Khi trình duyệt hỏi lại quyền, chọn <b>“Cho phép mọi lần truy cập”</b> để không phải bấm lại.
+      Mỗi máy nên dùng một file riêng.</p>`;
+    const when = s.lastWrite ? `lần ghi gần nhất ${stamp(s.lastWrite)}` : 'chưa ghi lần nào';
+    if (s.status === 'unsupported') {
+      return `<p class="muted">Trình duyệt này không cho trang web ghi file trên ổ đĩa (chỉ Chrome / Edge trên máy tính có).
+        Hãy dùng “Xuất file .sqlite” để sao lưu định kỳ.</p>`;
+    }
+    if (s.status === 'off') {
+      return `<p class="muted">Ứng dụng tự ghi toàn bộ dữ liệu vào một file bạn chọn sau mỗi thay đổi (tối đa 30 giây một lần).
+        File nằm ngoài trình duyệt nên còn nguyên kể cả khi dữ liệu trình duyệt bị xoá; khi đó chỉ cần “Nhập file .sqlite”.</p>
+        ${tip}<button type="button" class="btn" data-act="sink-pick">📁 Chọn file để tự lưu</button>`;
+    }
+    const name = `<b>${esc(s.name || '')}</b>`;
+    if (s.status === 'needs-permission') {
+      return `<p class="file-sink-warn">⚠ Đã tạm dừng ghi vào ${name}: trình duyệt cần bạn cho phép lại (${when}).</p>${tip}
+        <div class="btn-row"><button type="button" class="btn" data-act="sink-resume">Tiếp tục tự lưu</button>
+        <button type="button" class="btn ghost" data-act="sink-pick">Chọn file khác</button>
+        <button type="button" class="btn ghost" data-act="sink-off">Tắt</button></div>`;
+    }
+    if (s.status === 'error') {
+      return `<p class="file-sink-warn">⚠ Không ghi được vào ${name}: ${esc(s.error)}</p>
+        <div class="btn-row"><button type="button" class="btn" data-act="sink-pick">Chọn lại file</button>
+        <button type="button" class="btn ghost" data-act="sink-off">Tắt</button></div>`;
+    }
+    return `<p>✓ Đang tự lưu vào ${name} · ${when}.</p>
+      <div class="btn-row"><button type="button" class="btn ghost" data-act="sink-now">Ghi ngay</button>
+      <button type="button" class="btn ghost" data-act="sink-pick">Đổi file</button>
+      <button type="button" class="btn ghost" data-act="sink-off">Tắt</button></div>`;
   }
 
   function auditHtml() {

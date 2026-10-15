@@ -20,7 +20,10 @@
 
   // Tab khác vừa nhận quyền ghi: lưu nốt (nếu còn kịp) rồi dừng ghi
   async function onLost({ stolen }) {
-    if (!stolen) await T.db.flush();
+    if (!stolen) {
+      await T.db.flush();
+      await T.fileSink.flush();
+    }
     T.db.detach();
     document.querySelectorAll('.modal-wrap').forEach(m => m.remove());
     await blockScreen('Ứng dụng đang mở ở tab khác',
@@ -69,6 +72,20 @@
     saveEl.textContent = SAVE_TEXT[s];
   });
 
+  // Tự lưu ra file: thanh bên chỉ hiện khi cần người dùng bấm (xin lại quyền) hoặc khi lỗi
+  const fileEl = document.getElementById('fileState');
+  T.fileSink.onChange(s => {
+    fileEl.dataset.state = s.status;
+    fileEl.hidden = s.status !== 'needs-permission' && s.status !== 'error';
+    fileEl.textContent = s.status === 'error' ? '📁 Tự lưu ra file bị lỗi — xem Cài đặt' : '📁 Bấm để tiếp tục tự lưu ra file';
+    fileEl.title = s.status === 'error' ? s.error : 'Trình duyệt cần bạn cho phép ghi lại vào file ' + (s.name || '');
+  });
+  fileEl.onclick = async () => {
+    if (T.fileSink.state().status === 'error') { location.hash = '#/cai-dat'; return; }
+    if (await T.fileSink.resume()) T.ui.toast('Đã tiếp tục tự lưu ra file');
+  };
+  T.fileSink.init().catch(err => console.error(err));
+
   // Xin trình duyệt không tự dọn dữ liệu khi máy thiếu dung lượng
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 
@@ -80,6 +97,6 @@
     e.returnValue = '';
   });
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') T.db.flush();
+    if (document.visibilityState === 'hidden') T.db.flush().then(() => T.fileSink.flush());
   });
 })(window.TSTB);
