@@ -471,7 +471,7 @@
 
   T.db = {
     init, run, query, get, scalar, insert, tx, flush, dirty, onStatus, detach, exportBytes, importBytes, reset,
-    listSnapshots, restoreSnapshot, usage, SNAP_MAX, schemaVersion: latest, MIGRATIONS,
+    listSnapshots, restoreSnapshot, guard, usage, SNAP_MAX, schemaVersion: latest, MIGRATIONS,
     status: () => status
   };
 })(window.TSTB);

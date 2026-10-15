@@ -26,6 +26,7 @@ const FILES = [
   'js/data/evolutions.js',
   'js/data/groups.js',
   'js/data/stats.js',
+  'js/data/integrity.js',
   'js/features/award.js',
   'js/features/excel-import.js'
 ];

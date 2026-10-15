@@ -264,6 +264,7 @@
   // ---------- Dữ liệu ----------
   function tabData(body) {
     body.innerHTML = `
+      <div id="integrityBox"></div>
       <h2>Sao lưu & khôi phục</h2>
       <p class="muted">Dữ liệu được lưu trong trình duyệt này (IndexedDB), gắn với vị trí thư mục của ứng dụng.
         Hãy xuất file <b>.sqlite</b> định kỳ để sao lưu, hoặc khi đổi máy, đổi trình duyệt, di chuyển thư mục.</p>
@@ -289,6 +290,7 @@
       }).catch(() => {});
     }
     renderSnapshots(body);
+    renderIntegrity(body);
 
     body.querySelector('#importDb').onchange = async e => {
       const file = e.target.files[0];
@@ -308,6 +310,7 @@
       if (!btn) return;
       if (btn.dataset.act === 'export') return T.backup.exportFile();
       if (btn.dataset.act === 'restore') return restore(btn.dataset.key, btn.dataset.label);
+      if (btn.dataset.act === 'repair') return repair();
       if (!(await T.ui.confirm('Xoá TOÀN BỘ dữ liệu? Ứng dụng sẽ chụp lại dữ liệu hiện tại trước khi xoá.', { danger: true, okLabel: 'Tiếp tục' }))) return;
       if (!(await T.ui.confirm('Xác nhận lần cuối: bạn đã sao lưu hoặc chắc chắn muốn xoá hết?', { danger: true, okLabel: 'Xoá hết' }))) return;
       try {
@@ -318,6 +321,18 @@
       }
       refresh();
     };
+
+    async function repair() {
+      if (!(await T.ui.confirm('Xoá các bản ghi mồ côi và đưa giá trị lạ về mặc định? Dữ liệu hiện tại sẽ được chụp lại trước khi sửa.',
+        { okLabel: 'Sửa dữ liệu' }))) return;
+      try {
+        const n = await T.integrity.repair();
+        T.ui.toast(`Đã sửa ${n} bản ghi`);
+      } catch (err) {
+        T.ui.toast(err.message || 'Không sửa được dữ liệu', 'error');
+      }
+      refresh();
+    }
 
     async function restore(key, label) {
       if (!(await T.ui.confirm(`Khôi phục bản chụp “${label}”? Dữ liệu hiện tại sẽ được chụp lại trước khi thay.`,
@@ -332,12 +347,28 @@
     }
   }
 
+  function renderIntegrity(body) {
+    const box = body.querySelector('#integrityBox');
+    let r;
+    try { r = T.integrity.check(); } catch (err) { r = { ok: false, fileError: err.message, issues: [] }; }
+    if (r.ok) { box.innerHTML = ''; return; }
+    box.innerHTML = `<div class="integrity-box">
+      <h2>⚠ Dữ liệu có lỗi</h2>
+      ${r.fileError ? `<p>File dữ liệu bị hỏng (${esc(r.fileError)}). Không tự sửa được: hãy khôi phục một bản chụp bên dưới
+        hoặc nhập file sao lưu.</p>` : ''}
+      ${r.issues.length ? `<ul>${r.issues.map(i => `<li>${esc(i.label)}: <b>${i.count}</b></li>`).join('')}</ul>
+        <p class="muted">Những bản ghi này không còn gắn với dữ liệu nào đang dùng (thường do phiên bản cũ hoặc file bị chỉnh tay).</p>
+        <button type="button" class="btn" data-act="repair">🧹 Sửa dữ liệu lỗi</button>` : ''}
+    </div>`;
+  }
+
   const SNAP_REASONS = {
     daily: 'Tự động hằng ngày',
     'before-import': 'Trước khi nhập file',
     'before-reset': 'Trước khi xoá toàn bộ',
     'before-restore': 'Trước khi khôi phục',
-    'before-migrate': 'Trước khi nâng cấp dữ liệu'
+    'before-migrate': 'Trước khi nâng cấp dữ liệu',
+    'before-repair': 'Trước khi sửa dữ liệu lỗi'
   };
   const mb = n => (n / 1048576).toLocaleString('vi-VN', { maximumFractionDigits: n < 10485760 ? 2 : 0 }) + ' MB';
   const stamp = ms => new Date(ms).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour12: false });

@@ -49,6 +49,13 @@
   document.getElementById('app').hidden = false;
   T.router.start();
 
+  // Kiểm tra toàn vẹn dữ liệu; có lỗi thì nhắc vào Cài đặt → Dữ liệu để xem và sửa
+  try {
+    if (!T.integrity.check().ok) T.ui.toast('Phát hiện dữ liệu lỗi. Vào Cài đặt → Dữ liệu để xem và sửa.', 'warn', 8000);
+  } catch (err) {
+    console.error(err);
+  }
+
   // Chỉ báo trạng thái lưu ở thanh bên
   const SAVE_TEXT = {
     saved: '✓ Đã lưu',

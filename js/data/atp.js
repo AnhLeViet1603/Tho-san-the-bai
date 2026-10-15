@@ -13,8 +13,11 @@
 
   // Ghi một lượt cộng cho nhiều học sinh; amount được chụp lại tại thời điểm ghi
   function award(studentIds, lessonId, type, opts = {}) {
+    if (!TYPES[type]) throw new Error('Loại cộng ATP không hợp lệ: ' + type);
     const lesson = T.lessons.get(lessonId);
+    if (!lesson) throw new Error('Không tìm thấy tiết học');
     const amount = opts.amount != null ? opts.amount : amountFor(type);
+    if (!Number.isInteger(amount)) throw new Error('Số ATP phải là số nguyên');
     const batch = Date.now() + '-' + Math.random().toString(36).slice(2, 8);
     T.db.tx(() => studentIds.forEach(sid => T.db.run(
       `INSERT INTO atp_events (student_id, class_id, lesson_id, type, amount, group_id, batch_id, note)

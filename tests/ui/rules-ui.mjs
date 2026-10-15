@@ -127,5 +127,26 @@ check('An không được lật bù', await flips(an) === 1 && await ev(`TSTB.ev
 await go('the-bai');
 check('Lịch sử thẻ vẫn hiện lá của loại đã xoá', /An/.test(await ev("document.querySelector('.view').innerText.split('Lịch sử thẻ')[1] || ''")));
 
+console.log('▸ Dữ liệu lỗi');
+// Xoá học sinh bằng SQL, bỏ qua dây chuyền → ATP và thẻ của em thành mồ côi
+await ev(`TSTB.db.run('DELETE FROM students WHERE id = ?', [${an}]), TSTB.db.flush()`);
+await send('Page.reload');
+await sleep(300);
+await waitFor("!document.getElementById('app').hidden");
+check('mở ứng dụng thì nhắc có dữ liệu lỗi', await waitFor("/Phát hiện dữ liệu lỗi/.test(document.getElementById('toasts').innerText)", 3000));
+await go('cai-dat');
+await click('[data-tab="data"]');
+await sleep(300);
+const box = await text('.integrity-box');
+check('Cài đặt → Dữ liệu liệt kê lỗi kèm số lượng', /Lượt cộng ATP của học sinh/.test(box) && /Thẻ của học sinh/.test(box), box);
+await shot('du-lieu-loi');
+await click('[data-act="repair"]');
+await sleep(200);
+await confirmOk();
+await waitFor("!document.querySelector('.integrity-box')", 3000);
+check('sửa xong: hết khung báo lỗi, dữ liệu sạch', await ev('TSTB.integrity.check().ok'));
+check('có bản chụp "Trước khi sửa dữ liệu lỗi"', await waitFor("/Trước khi sửa dữ liệu lỗi/.test(document.getElementById('snapList').innerText)", 3000));
+check('dữ liệu của Bình giữ nguyên', await ev(`TSTB.db.scalar('SELECT COUNT(*) FROM students WHERE id = ?', [${binh}])`) === 1);
+
 check('không có lỗi JS', !b.pageErrors.length, b.pageErrors);
 b.finish();

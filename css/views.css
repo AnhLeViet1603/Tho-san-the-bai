@@ -88,3 +88,11 @@
   .chart.wide { grid-column: auto; }
   .journey { grid-template-columns: 1fr; }
 }
+
+/* Cài đặt → Dữ liệu: báo dữ liệu lỗi */
+.integrity-box {
+  margin-bottom: 18px; padding: 14px 16px; border-radius: 12px;
+  background: #3a2a10; border: 1px solid var(--atp);
+}
+.integrity-box h2 { margin-top: 0; }
+.integrity-box ul { margin: 8px 0; padding-left: 20px; }

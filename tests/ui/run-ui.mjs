@@ -485,6 +485,13 @@ await group('11. Lưu bền + giao diện hẹp', async () => {
 });
 
 await group('12. Xoá toàn bộ dữ liệu', async () => {
+  // Sau mọi thao tác thật ở các nhóm trên (thêm / xoá lớp, học sinh, nhóm, thẻ, hoàn tác…)
+  check('các luồng thật của ứng dụng không để lại dữ liệu lỗi', await ev('TSTB.integrity.check().ok'),
+    await ev('JSON.stringify(TSTB.integrity.check())'));
+  await go('cai-dat');
+  await click('[data-tab="data"]');
+  await sleep(200);
+  check('dữ liệu sạch thì không hiện khung báo lỗi', await count('.integrity-box') === 0);
   await go('cai-dat');
   await click('[data-tab="data"]');
   await sleep(200);
