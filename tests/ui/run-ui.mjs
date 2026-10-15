@@ -496,6 +496,26 @@ await group('12. Xoá toàn bộ dữ liệu', async () => {
   await modalOk();
   await sleep(500);
   check('sau 2 lần xác nhận: dữ liệu sạch, thẻ mẫu trở lại', await ev('TSTB.classes.list().length') === 0 && await ev('TSTB.cards.list().length') === 5);
+
+  await waitFor("/Trước khi xoá toàn bộ/.test(document.getElementById('snapList').innerText)");
+  const snapText = await text('#snapList');
+  check('có bản chụp "Trước khi xoá toàn bộ" và bản hằng ngày', /Trước khi xoá toàn bộ/.test(snapText) && /Tự động hằng ngày/.test(snapText), snapText);
+  check('hiện dung lượng bộ nhớ đang dùng', /Đang dùng .* MB/.test(await text('#usageNote')), await text('#usageNote'));
+  await shot('12-ban-chup');
+  await ev(`[...document.querySelectorAll('#snapList tr')].find(tr => /Trước khi xoá toàn bộ/.test(tr.innerText)).querySelector('[data-act="restore"]').click()`);
+  await sleep(150);
+  check('khôi phục phải xác nhận', /Khôi phục bản chụp/.test(await text('.confirm-msg')));
+  await modalOk();
+  await waitFor('TSTB.classes.list().length === 1');
+  check('khôi phục bản chụp: lớp và thẻ trở lại', await ev('TSTB.classes.list().length') === 1 && await ev('TSTB.cards.list().length') === 6);
+  await waitFor("/Trước khi khôi phục/.test(document.getElementById('snapList').innerText)");
+  check('khôi phục cũng tạo bản chụp "Trước khi khôi phục"', /Trước khi khôi phục/.test(await text('#snapList')));
+
+  await send('Emulation.setDeviceMetricsOverride', { width: 600, height: 900, deviceScaleFactor: 1, mobile: false });
+  await sleep(300);
+  const over = await ev('document.documentElement.scrollWidth - innerWidth');
+  check('tab Dữ liệu không tràn ngang ở màn hình 600px', over <= 0, over);
+  await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
 });
 
 section = 'Chung';

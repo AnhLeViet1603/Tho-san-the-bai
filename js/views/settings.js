@@ -263,8 +263,13 @@
         <button type="button" class="btn" data-act="export">⬇ Xuất file .sqlite</button>
         <label class="btn ghost">⬆ Nhập file .sqlite<input type="file" id="importDb" accept=".sqlite,.db,.sqlite3" hidden></label>
       </div>
+      <h2>Bản chụp tự động</h2>
+      <p class="muted">Ứng dụng tự chụp lại dữ liệu mỗi ngày và trước khi nhập file, xoá toàn bộ hay khôi phục; giữ ${T.db.SNAP_MAX} bản gần nhất.
+        Bản chụp nằm cùng chỗ với dữ liệu trong trình duyệt nên <b>không thay được file sao lưu</b>: xoá dữ liệu trình duyệt là mất cả hai.</p>
+      <div id="snapList"><p class="muted">Đang đọc…</p></div>
+      <p class="muted" id="usageNote"></p>
       <h2>Vùng nguy hiểm</h2>
-      <p class="muted">Xoá sạch mọi lớp, học sinh, ATP và thẻ bài, đưa ứng dụng về trạng thái ban đầu.</p>
+      <p class="muted">Xoá sạch mọi lớp, học sinh, ATP và thẻ bài, đưa ứng dụng về trạng thái ban đầu. Có thể lùi lại bằng bản chụp “Trước khi xoá toàn bộ”.</p>
       <button type="button" class="btn danger" data-act="reset">Xoá toàn bộ dữ liệu</button>`;
 
     if (navigator.storage && navigator.storage.persisted) {
@@ -273,6 +278,7 @@
         if (note) note.hidden = ok;
       }).catch(() => {});
     }
+    renderSnapshots(body);
 
     body.querySelector('#importDb').onchange = async e => {
       const file = e.target.files[0];
@@ -291,12 +297,59 @@
       const btn = e.target.closest('[data-act]');
       if (!btn) return;
       if (btn.dataset.act === 'export') return T.backup.exportFile();
-      if (!(await T.ui.confirm('Xoá TOÀN BỘ dữ liệu? Hành động này không thể hoàn tác.', { danger: true, okLabel: 'Tiếp tục' }))) return;
+      if (btn.dataset.act === 'restore') return restore(btn.dataset.key, btn.dataset.label);
+      if (!(await T.ui.confirm('Xoá TOÀN BỘ dữ liệu? Ứng dụng sẽ chụp lại dữ liệu hiện tại trước khi xoá.', { danger: true, okLabel: 'Tiếp tục' }))) return;
       if (!(await T.ui.confirm('Xác nhận lần cuối: bạn đã sao lưu hoặc chắc chắn muốn xoá hết?', { danger: true, okLabel: 'Xoá hết' }))) return;
-      await T.db.reset();
-      T.ui.toast('Đã xoá toàn bộ dữ liệu');
+      try {
+        await T.db.reset();
+        T.ui.toast('Đã xoá toàn bộ dữ liệu');
+      } catch (err) {
+        T.ui.toast(err.message || 'Không xoá được dữ liệu', 'error');
+      }
       refresh();
     };
+
+    async function restore(key, label) {
+      if (!(await T.ui.confirm(`Khôi phục bản chụp “${label}”? Dữ liệu hiện tại sẽ được chụp lại trước khi thay.`,
+        { danger: true, okLabel: 'Khôi phục' }))) return;
+      try {
+        await T.db.restoreSnapshot(key);
+        T.ui.toast('Đã khôi phục bản chụp');
+      } catch (err) {
+        T.ui.toast(err.message || 'Không khôi phục được', 'error');
+      }
+      refresh();
+    }
+  }
+
+  const SNAP_REASONS = {
+    daily: 'Tự động hằng ngày',
+    'before-import': 'Trước khi nhập file',
+    'before-reset': 'Trước khi xoá toàn bộ',
+    'before-restore': 'Trước khi khôi phục'
+  };
+  const mb = n => (n / 1048576).toLocaleString('vi-VN', { maximumFractionDigits: n < 10485760 ? 2 : 0 }) + ' MB';
+  const stamp = ms => new Date(ms).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour12: false });
+
+  async function renderSnapshots(body) {
+    const box = body.querySelector('#snapList');
+    let snaps;
+    try {
+      snaps = await T.db.listSnapshots();
+    } catch (err) {
+      box.innerHTML = `<p class="muted">Không đọc được bản chụp: ${T.ui.esc(err.message)}</p>`;
+      return;
+    }
+    box.innerHTML = snaps.length ? `<table class="table snap-table"><thead><tr><th>Thời điểm</th><th>Lý do</th><th>Dung lượng</th><th></th></tr></thead>
+      <tbody>${snaps.map(s => {
+        const label = `${stamp(s.at)} · ${SNAP_REASONS[s.reason] || s.reason}`;
+        return `<tr><td>${stamp(s.at)}</td><td>${T.ui.esc(SNAP_REASONS[s.reason] || s.reason)}</td><td>${mb(s.size)}</td>
+          <td class="row-actions"><button type="button" class="btn sm ghost" data-act="restore"
+            data-key="${T.ui.esc(s.key)}" data-label="${T.ui.esc(label)}">↺ Khôi phục</button></td></tr>`;
+      }).join('')}</tbody></table>` : '<p class="muted">Chưa có bản chụp nào.</p>';
+    const u = await T.db.usage();
+    const note = body.querySelector('#usageNote');
+    if (u && u.quota && note) note.textContent = `Đang dùng ${mb(u.usage)} / ${mb(u.quota)} bộ nhớ trình duyệt cấp cho ứng dụng.`;
   }
 
   const BODIES = { classes: tabClasses, students: tabStudents, atp: tabAtp, cards: tabCards, data: tabData };

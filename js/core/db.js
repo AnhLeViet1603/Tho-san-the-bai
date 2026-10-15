@@ -72,6 +72,10 @@
     ['Thẻ Linh Trưởng', '+1 điểm vào bài kiểm tra 1 tiết.', '🦧']
   ];
 
+  // Phiên bản cấu trúc dữ liệu mà bản ứng dụng này hiểu được
+  const SCHEMA_VERSION = 1;
+  const SNAP_MAX = 5;
+
   // Lưu lỗi thì thử lại sau 1s, 3s rồi cứ 10s một lần
   const RETRY = [1000, 3000, 10000];
 
@@ -81,7 +85,7 @@
   let retryTimer = null;
   let depth = 0;
   let persist = true;
-  let storage = null;  // { get, set }: mặc định là IndexedDB
+  let storage = null;  // { get, set, del, keys }: mặc định là IndexedDB
   let version = 0;     // tăng mỗi lần dữ liệu đổi
   let savedVersion = 0;
   let saving = null;
@@ -98,24 +102,24 @@
     });
   }
 
-  async function idbGet() {
+  // Kho key–value trên IndexedDB: 'db.sqlite' là dữ liệu chính, 'snap:…' là các bản chụp
+  async function idbReq(mode, fn) {
     const idb = await openIdb();
     return new Promise((resolve, reject) => {
-      const req = idb.transaction(IDB_STORE).objectStore(IDB_STORE).get(IDB_KEY);
-      req.onsuccess = () => { idb.close(); resolve(req.result || null); };
-      req.onerror = () => { idb.close(); reject(req.error); };
+      const tx = idb.transaction(IDB_STORE, mode);
+      const req = fn(tx.objectStore(IDB_STORE));
+      tx.oncomplete = () => { idb.close(); resolve(req.result); };
+      tx.onerror = () => { idb.close(); reject(tx.error); };
+      tx.onabort = () => { idb.close(); reject(tx.error); };
     });
   }
 
-  async function idbSet(bytes) {
-    const idb = await openIdb();
-    return new Promise((resolve, reject) => {
-      const tx = idb.transaction(IDB_STORE, 'readwrite');
-      tx.objectStore(IDB_STORE).put(bytes, IDB_KEY);
-      tx.oncomplete = () => { idb.close(); resolve(); };
-      tx.onerror = () => { idb.close(); reject(tx.error); };
-    });
-  }
+  const idbStorage = {
+    get: async key => (await idbReq('readonly', st => st.get(key))) || null,
+    set: (key, value) => idbReq('readwrite', st => st.put(value, key)),
+    del: key => idbReq('readwrite', st => st.delete(key)),
+    keys: () => idbReq('readonly', st => st.getAllKeys())
+  };
 
   function setStatus(next) {
     if (next === status) return;
@@ -139,7 +143,7 @@
     const v = version;
     setStatus('saving');
     try {
-      saving = storage.set(db.export());
+      saving = storage.set(IDB_KEY, db.export());
       await saving;
       savedVersion = v;
       failures = 0;
@@ -253,40 +257,121 @@
   }
 
   // opts.persist = false: chỉ giữ dữ liệu trong bộ nhớ (dùng cho test)
-  // opts.storage = { get, set }: thay IndexedDB (dùng cho test)
+  // opts.storage = { get, set, del, keys }: thay IndexedDB (dùng cho test)
   async function init(opts = {}) {
     if (typeof initSqlJs !== 'function') throw new Error('Thiếu file vendor/sql-asm.js');
     persist = opts.persist !== false;
-    storage = opts.storage || { get: idbGet, set: idbSet };
+    storage = opts.storage || idbStorage;
     clearTimeout(timer);
     clearTimeout(retryTimer);
     timer = retryTimer = null;
     version = savedVersion = failures = 0;
     status = 'saved';
     if (!SQL) SQL = await initSqlJs();
-    const bytes = persist ? await storage.get() : null;
+    const bytes = persist ? await storage.get(IDB_KEY) : null;
     if (db) db.close();
     db = bytes ? new SQL.Database(bytes) : new SQL.Database();
     prepare();
     changed();
     await flush();
+    if (persist) await dailySnapshot();
   }
 
   const exportBytes = () => db.export();
 
-  async function importBytes(bytes) {
-    const next = new SQL.Database(bytes);
-    let ok = false;
-    try {
-      const st = next.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'classes'");
-      ok = st.step();
-      st.free();
-    } catch (err) {
-      ok = false;
+  // ---------- Bản chụp: giữ tối đa SNAP_MAX bản trong IndexedDB để lùi lại khi nhập nhầm / xoá nhầm ----------
+  const SNAP_PREFIX = 'snap:';
+
+  // { key, at, reason, size } mới nhất trước
+  async function listSnapshots() {
+    if (!persist) return [];
+    const keys = (await storage.keys()).filter(k => String(k).startsWith(SNAP_PREFIX));
+    const out = [];
+    for (const key of keys) {
+      const snap = await storage.get(key);
+      if (snap) out.push({ key, at: snap.at, reason: snap.reason, size: snap.bytes.length });
     }
-    if (!ok) {
-      next.close();
+    return out.sort((x, y) => y.at - x.at);
+  }
+
+  // Chụp dữ liệu hiện tại. Ném lỗi nếu không ghi được (ví dụ đầy bộ nhớ); trả về key, hoặc null khi không lưu bền.
+  async function snapshot(reason) {
+    if (!persist) return null;
+    const at = Date.now();
+    const key = `${SNAP_PREFIX}${at}:${reason}:${Math.random().toString(36).slice(2, 8)}`;
+    await storage.set(key, { at, reason, bytes: db.export() });
+    const old = (await listSnapshots()).slice(SNAP_MAX);
+    for (const s of old) await storage.del(s.key);
+    return key;
+  }
+
+  // Bản chụp hằng ngày lúc mở ứng dụng; lỗi thì bỏ qua (không chặn việc dùng ứng dụng)
+  async function dailySnapshot() {
+    try {
+      const last = (await listSnapshots()).find(s => s.reason === 'daily');
+      if (!last || Date.now() - last.at >= T.time.DAY) await snapshot('daily');
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  // Chụp trước một thao tác thay toàn bộ dữ liệu; không chụp được thì không cho làm
+  async function guard(reason) {
+    try {
+      await snapshot(reason);
+    } catch (err) {
+      console.error(err);
+      throw new Error('Không tạo được bản chụp an toàn trước khi thay dữ liệu (' + (err && err.message) +
+        '). Hãy xuất file sao lưu rồi thử lại.');
+    }
+  }
+
+  // Phiên bản cấu trúc dữ liệu của một DB (lấy số lớn hơn giữa PRAGMA user_version và setting schema_version)
+  function schemaOf(d) {
+    const one = sql => {
+      const st = d.prepare(sql);
+      try { return st.step() ? st.get()[0] : null; } finally { st.free(); }
+    };
+    let setting = null;
+    try { setting = one("SELECT value FROM settings WHERE key = 'schema_version'"); } catch (err) { /* chưa có bảng settings */ }
+    return Math.max(Number(one('PRAGMA user_version')) || 0, Number(setting) || 0);
+  }
+
+  // Mở file .sqlite và kiểm tra trước khi dùng; ném lỗi mô tả rõ nếu không hợp lệ
+  function openChecked(bytes) {
+    let next;
+    try {
+      next = new SQL.Database(bytes);
+      const st = next.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'classes'");
+      const ok = st.step();
+      st.free();
+      if (!ok) throw new Error('no classes');
+    } catch (err) {
+      if (next) next.close();
       throw new Error('File không phải dữ liệu của Thợ Săn Thẻ Bài');
+    }
+    const st = next.prepare('PRAGMA integrity_check');
+    const check = st.step() ? st.get()[0] : 'không đọc được';
+    st.free();
+    if (check !== 'ok') {
+      next.close();
+      throw new Error('File sao lưu bị hỏng: ' + check);
+    }
+    if (schemaOf(next) > SCHEMA_VERSION) {
+      next.close();
+      throw new Error('File được tạo bởi phiên bản mới hơn của ứng dụng. Hãy cập nhật ứng dụng rồi nhập lại.');
+    }
+    return next;
+  }
+
+  // opts.reason: lý do của bản chụp tạo trước khi thay ('before-import' mặc định)
+  async function importBytes(bytes, opts = {}) {
+    const next = openChecked(bytes);
+    try {
+      await guard(opts.reason || 'before-import');
+    } catch (err) {
+      next.close();
+      throw err;
     }
     db.close();
     db = next;
@@ -295,12 +380,29 @@
     await flush();
   }
 
+  async function restoreSnapshot(key) {
+    const snap = await storage.get(key);
+    if (!snap) throw new Error('Không tìm thấy bản chụp');
+    await importBytes(snap.bytes, { reason: 'before-restore' });
+  }
+
   async function reset() {
+    await guard('before-reset');
     db.close();
     db = new SQL.Database();
     prepare();
     changed();
     await flush();
+  }
+
+  // Dung lượng trình duyệt cấp cho ứng dụng: { usage, quota } (byte) hoặc null nếu không biết
+  async function usage() {
+    try {
+      const nav = window.navigator;
+      return nav && nav.storage && nav.storage.estimate ? await nav.storage.estimate() : null;
+    } catch (err) {
+      return null;
+    }
   }
 
   // Ngừng ghi vào IndexedDB (tab khác đã nhận quyền ghi). Thay đổi sau đó chỉ nằm trong bộ nhớ.
@@ -313,6 +415,7 @@
 
   T.db = {
     init, run, query, get, scalar, insert, tx, flush, dirty, onStatus, detach, exportBytes, importBytes, reset,
+    listSnapshots, restoreSnapshot, usage, SNAP_MAX,
     status: () => status
   };
 })(window.TSTB);

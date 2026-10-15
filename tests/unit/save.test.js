@@ -3,24 +3,10 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { boot } = require('../helpers/app');
+const { boot, fakeStorage } = require('../helpers/app');
 
 // Chờ các promise đang dở chạy xong (setImmediate không bị mock timers chặn)
 const settle = async () => { for (let i = 0; i < 5; i++) await new Promise(r => setImmediate(r)); };
-
-// Kho lưu giả thay IndexedDB; fails = số lần ghi tiếp theo sẽ lỗi
-function fakeStorage(fails = 0) {
-  const s = {
-    data: null, fails, writes: 0,
-    get: async () => s.data,
-    set: async bytes => {
-      s.writes++;
-      if (s.fails > 0) { s.fails--; throw new Error('QuotaExceededError'); }
-      s.data = bytes;
-    }
-  };
-  return s;
-}
 
 const addClass = (T, name) => T.classes.save({ name, icon: '🧬', color: '#5fe08a', note: '' });
 const classCount = T => T.db.scalar('SELECT COUNT(*) FROM classes');
@@ -97,7 +83,7 @@ test('lỗi kéo dài: cứ 10s thử lại một lần, không dừng', async t
 test('thay đổi xảy ra khi đang ghi thì được ghi tiếp ở lượt sau', async t => {
   const { T, storage } = await setup(t);
   let release;
-  storage.set = bytes => { storage.writes++; return new Promise(r => { release = () => { storage.data = bytes; r(); }; }); };
+  storage.set = (key, bytes) => { if (key !== 'db.sqlite') return Promise.resolve(); storage.writes++; return new Promise(r => { release = () => { storage.data = bytes; r(); }; }); };
   addClass(T, '10A1');
   t.mock.timers.tick(300);
   await settle();
@@ -111,7 +97,7 @@ test('thay đổi xảy ra khi đang ghi thì được ghi tiếp ở lượt sa
   release();
   await settle();
   assert.equal(T.db.status(), 'saved');
-  storage.set = async b => { storage.data = b; };
+  storage.set = async (key, b) => { if (key === 'db.sqlite') storage.data = b; };
   await T.db.init({ storage });
   assert.equal(classCount(T), 2);
 });

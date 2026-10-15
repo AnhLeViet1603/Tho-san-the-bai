@@ -34,7 +34,7 @@ Lần chạy đầu tiên ứng dụng tự tạo cơ sở dữ liệu và 5 th�
 | 🐾 **Chia nhóm trong tiết** | Chia ngẫu nhiên hoặc kéo thả. Cộng điểm cho nhóm thì mọi thành viên đều nhận ATP. |
 | 📊 **Thống kê** | Biểu đồ tròn, biểu đồ cột theo lớp, thời gian, loại hoạt động, nhóm, học sinh; kèm bảng xếp hạng. |
 | 📥 **Nhập từ Excel** | Chọn file `.xlsx` / `.xls` / `.csv`, chọn cột họ tên, xem trước rồi nhập. Tên trùng được bỏ qua. |
-| 💾 **Sao lưu** | Xuất toàn bộ dữ liệu ra một file `.sqlite`, nhập lại trên máy khác. |
+| 💾 **Sao lưu** | Xuất toàn bộ dữ liệu ra một file `.sqlite`, nhập lại trên máy khác. Ứng dụng tự chụp lại dữ liệu mỗi ngày và trước khi nhập file / xoá toàn bộ, khôi phục được trong Cài đặt → Dữ liệu. |
 
 ## Luật chơi
 

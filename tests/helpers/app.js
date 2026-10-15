@@ -86,4 +86,24 @@ function stampEvents(T, sqlUtc, where) {
   T.db.run(`UPDATE atp_events SET created_at = ? ${where ? 'WHERE ' + where : ''}`, [sqlUtc]);
 }
 
-module.exports = { boot, seedClass, freeze, stampEvents, dateOf, DAY };
+// Kho lưu giả thay IndexedDB; fails = số lần ghi dữ liệu chính tiếp theo sẽ lỗi.
+// s.data là dữ liệu chính ('db.sqlite'); s.map chứa mọi key (kể cả bản chụp).
+function fakeStorage(fails = 0) {
+  const s = {
+    map: new Map(), fails, writes: 0,
+    get data() { return s.map.get('db.sqlite') || null; },
+    set data(v) { s.map.set('db.sqlite', v); },
+    get: async key => s.map.get(key) || null,
+    set: async (key, value) => {
+      if (key !== 'db.sqlite') { s.map.set(key, value); return; }
+      s.writes++;
+      if (s.fails > 0) { s.fails--; throw new Error('QuotaExceededError'); }
+      s.data = value;
+    },
+    del: async key => { s.map.delete(key); },
+    keys: async () => [...s.map.keys()]
+  };
+  return s;
+}
+
+module.exports = { boot, seedClass, freeze, stampEvents, dateOf, fakeStorage, DAY };

@@ -46,31 +46,33 @@ function fakeLocks() {
   };
 }
 
-async function setup() {
+// Đóng mọi tab sau mỗi test (kể cả khi assert lỗi), nếu không BroadcastChannel giữ tiến trình chạy mãi.
+// stealAfter mặc định đủ dài để máy chậm không cướp lock sai lúc; test cướp lock tự đặt ngắn.
+async function setup(t) {
   const { T } = await boot();
   const locks = fakeLocks();
   const tabs = [];
   const tab = env => {
-    const t = T.tabLock.create({ locks, Channel: BroadcastChannel, stealAfter: 50, ...env });
-    tabs.push(t);
-    return t;
+    const lock = T.tabLock.create({ locks, Channel: BroadcastChannel, stealAfter: 2000, ...env });
+    tabs.push(lock);
+    return lock;
   };
-  return { tab, closeAll: () => tabs.forEach(t => t.close()) };
+  t.after(() => tabs.forEach(x => x.close()));
+  return { tab };
 }
 
-test('tab đầu tiên giành được quyền ghi, tab thứ hai thì không', async () => {
-  const { tab, closeAll } = await setup();
+test('tab đầu tiên giành được quyền ghi, tab thứ hai thì không', async t => {
+  const { tab } = await setup(t);
   const a = tab();
   const b = tab();
   assert.equal(await a.acquire(), true);
   assert.equal(await b.acquire(), false);
   assert.equal(a.owns(), true);
   assert.equal(b.owns(), false);
-  closeAll();
 });
 
-test('xin nhường quyền ghi: tab cũ lưu nốt rồi mới nhả lock', async () => {
-  const { tab, closeAll } = await setup();
+test('xin nhường quyền ghi: tab cũ lưu nốt rồi mới nhả lock', async t => {
+  const { tab } = await setup(t);
   const a = tab();
   const b = tab();
   const steps = [];
@@ -81,13 +83,12 @@ test('xin nhường quyền ghi: tab cũ lưu nốt rồi mới nhả lock', asy
   assert.deepEqual(steps, [['a mất quyền', false], ['b nhận quyền']]);
   assert.equal(a.owns(), false);
   assert.equal(b.owns(), true);
-  closeAll();
 });
 
-test('tab cũ không phản hồi thì bị cướp lock sau thời gian chờ', async () => {
-  const { tab, closeAll } = await setup();
+test('tab cũ không phản hồi thì bị cướp lock sau thời gian chờ', async t => {
+  const { tab } = await setup(t);
   const a = tab({ Channel: null }); // không nghe được lời xin nhường
-  const b = tab();
+  const b = tab({ stealAfter: 50 });
   const lost = [];
   await a.acquire(info => lost.push(info.stolen));
   await b.takeover(() => {});
@@ -95,11 +96,10 @@ test('tab cũ không phản hồi thì bị cướp lock sau thời gian chờ',
   assert.equal(b.owns(), true);
   assert.equal(a.owns(), false);
   assert.deepEqual(lost, [true]);
-  closeAll();
 });
 
-test('nhường qua lại nhiều lần không làm kẹt lock', async () => {
-  const { tab, closeAll } = await setup();
+test('nhường qua lại nhiều lần không làm kẹt lock', async t => {
+  const { tab } = await setup(t);
   const a = tab();
   const b = tab();
   await a.acquire(() => {});
@@ -107,15 +107,13 @@ test('nhường qua lại nhiều lần không làm kẹt lock', async () => {
   await a.takeover(() => {});
   assert.equal(a.owns(), true);
   assert.equal(b.owns(), false);
-  closeAll();
 });
 
-test('trình duyệt không có Web Locks thì vẫn cho ghi', async () => {
-  const { tab, closeAll } = await setup();
+test('trình duyệt không có Web Locks thì vẫn cho ghi', async t => {
+  const { tab } = await setup(t);
   const a = tab({ locks: null });
   assert.equal(await a.acquire(), true);
   await a.takeover();
-  closeAll();
 });
 
 test('detach: thay đổi sau khi mất quyền ghi không được lưu', async () => {
