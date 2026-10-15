@@ -71,5 +71,24 @@ check('tải lại trang mở được', await waitFor(ready));
 check('lớp tạo lúc đang lỗi vẫn còn sau khi tải lại', await hasClass('Lop-2') === 1);
 check('lớp tạo trước đó vẫn còn', await hasClass('Lop-1') === 1);
 
+console.log('▸ Nâng cấp cấu trúc dữ liệu');
+// Giả DB của bản 1.1.x: chưa ghi user_version
+await ev("window.TSTB.db.run('PRAGMA user_version = 0'), window.TSTB.db.flush()");
+await send('Page.reload');
+await sleep(300);
+check('DB bản cũ mở được và được nâng cấp', await waitFor(ready) && await ev("window.TSTB.db.scalar('PRAGMA user_version')") === await ev('window.TSTB.db.schemaVersion()'));
+check('dữ liệu giữ nguyên sau nâng cấp', await hasClass('Lop-1') === 1 && await hasClass('Lop-2') === 1);
+check('có bản chụp "Trước khi nâng cấp dữ liệu"', await ev("window.TSTB.db.listSnapshots().then(s => s.some(x => x.reason === 'before-migrate'))"));
+
+// DB từ phiên bản mới hơn: báo lỗi, không ghi đè
+await ev("window.TSTB.db.run('PRAGMA user_version = 99'), window.TSTB.db.flush()");
+await send('Page.reload');
+await sleep(300);
+check('DB phiên bản mới hơn: báo lỗi rõ ràng thay vì mở', await waitFor("/phiên bản mới hơn/.test(document.getElementById('bootMsg')?.innerText || '')"),
+  await ev("document.getElementById('bootMsg')?.innerText"));
+await send('Page.reload');
+await sleep(300);
+check('mở lại vẫn báo lỗi (dữ liệu không bị ghi đè)', await waitFor("/phiên bản mới hơn/.test(document.getElementById('bootMsg')?.innerText || '')"));
+
 check('không có lỗi JS', !b.pageErrors.length, b.pageErrors);
 b.finish();

@@ -326,7 +326,8 @@
     daily: 'Tự động hằng ngày',
     'before-import': 'Trước khi nhập file',
     'before-reset': 'Trước khi xoá toàn bộ',
-    'before-restore': 'Trước khi khôi phục'
+    'before-restore': 'Trước khi khôi phục',
+    'before-migrate': 'Trước khi nâng cấp dữ liệu'
   };
   const mb = n => (n / 1048576).toLocaleString('vi-VN', { maximumFractionDigits: n < 10485760 ? 2 : 0 }) + ' MB';
   const stamp = ms => new Date(ms).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour12: false });

@@ -72,8 +72,6 @@
     ['Thẻ Linh Trưởng', '+1 điểm vào bài kiểm tra 1 tiết.', '🦧']
   ];
 
-  // Phiên bản cấu trúc dữ liệu mà bản ứng dụng này hiểu được
-  const SCHEMA_VERSION = 1;
   const SNAP_MAX = 5;
 
   // Lưu lỗi thì thử lại sau 1s, 3s rồi cứ 10s một lần
@@ -229,26 +227,57 @@
     }
   }
 
-  // Nâng cấp dữ liệu tạo bởi phiên bản cũ
-  function migrate() {
-    if (!query('PRAGMA table_info(cards)').some(c => c.name === 'expire_days')) {
-      db.run('ALTER TABLE cards ADD COLUMN expire_days INTEGER DEFAULT 30');
+  // ---------- Nâng cấp cấu trúc dữ liệu ----------
+  // Mỗi bước nâng DB từ phiên bản i lên i + 1 (PRAGMA user_version), nhận DB sql.js. Chỉ THÊM bước mới vào cuối,
+  // không sửa bước đã phát hành: DB của người dùng có thể đang ở bất kỳ phiên bản nào trước đó.
+  const MIGRATIONS = [
+    // 1: cấu trúc của bản 1.0.0 – 1.1.x (các bản này chưa ghi user_version nên DB của chúng có user_version = 0).
+    // Bổ sung luôn những gì bản thử nghiệm trước 1.0.0 còn thiếu.
+    () => {
+      db.run(SCHEMA);
+      if (!query('PRAGMA table_info(cards)').some(c => c.name === 'expire_days')) {
+        db.run('ALTER TABLE cards ADD COLUMN expire_days INTEGER DEFAULT 30');
+      }
+      if (scalar("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'evolutions'")) {
+        const now = Date.now();
+        db.run(`
+          INSERT INTO student_cards (student_id, card_id, year, status, granted_at, expires_at, used_at)
+          SELECT student_id, card_id, ?, CASE WHEN used THEN 'used' ELSE 'held' END, ?, ?, CASE WHEN used THEN ? END
+          FROM evolutions`, [T.time.parts().year, now, now + 30 * T.time.DAY, now]);
+        db.run('DROP TABLE evolutions');
+      }
     }
-    if (scalar("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'evolutions'")) {
-      const now = Date.now();
-      db.run(`
-        INSERT INTO student_cards (student_id, card_id, year, status, granted_at, expires_at, used_at)
-        SELECT student_id, card_id, ?, CASE WHEN used THEN 'used' ELSE 'held' END, ?, ?, CASE WHEN used THEN ? END
-        FROM evolutions`, [T.time.parts().year, now, now + 30 * T.time.DAY, now]);
-      db.run('DROP TABLE evolutions');
+  ];
+
+  let migrations = MIGRATIONS;
+  const latest = () => migrations.length;
+  const versionOf = () => Number(scalar('PRAGMA user_version')) || 0;
+
+  const NEWER = 'Dữ liệu được tạo bởi phiên bản mới hơn của ứng dụng. Hãy cập nhật ứng dụng rồi mở lại.';
+
+  // Chạy lần lượt các bước còn thiếu, mỗi bước một transaction: lỗi thì DB giữ nguyên ở bước trước.
+  function migrate() {
+    const from = versionOf();
+    if (from > latest()) throw new Error(NEWER);
+    for (let v = from; v < latest(); v++) {
+      db.run('BEGIN');
+      try {
+        migrations[v](db);
+        db.run(`PRAGMA user_version = ${v + 1}`);
+        db.run('COMMIT');
+      } catch (err) {
+        db.run('ROLLBACK');
+        throw new Error(`Không nâng cấp được dữ liệu lên phiên bản ${v + 1}: ${err.message}`);
+      }
     }
   }
 
   function prepare() {
-    db.run(SCHEMA);
     migrate();
     Object.entries(DEFAULT_SETTINGS).forEach(([k, v]) =>
       db.run('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', [k, v]));
+    // Giữ setting để file sao lưu đọc được phiên bản cả khi công cụ khác làm mất user_version
+    db.run("UPDATE settings SET value = ? WHERE key = 'schema_version'", [String(latest())]);
     if (!scalar("SELECT value FROM settings WHERE key = 'cards_seeded'")) {
       SEED_CARDS.forEach((c, i) =>
         db.run('INSERT INTO cards (name, description, icon, sort_order) VALUES (?, ?, ?, ?)', [...c, i]));
@@ -258,6 +287,7 @@
 
   // opts.persist = false: chỉ giữ dữ liệu trong bộ nhớ (dùng cho test)
   // opts.storage = { get, set, del, keys }: thay IndexedDB (dùng cho test)
+  // opts.migrations: thay danh sách bước nâng cấp (dùng cho test)
   async function init(opts = {}) {
     if (typeof initSqlJs !== 'function') throw new Error('Thiếu file vendor/sql-asm.js');
     persist = opts.persist !== false;
@@ -267,10 +297,16 @@
     timer = retryTimer = null;
     version = savedVersion = failures = 0;
     status = 'saved';
+    migrations = opts.migrations || MIGRATIONS;
     if (!SQL) SQL = await initSqlJs();
     const bytes = persist ? await storage.get(IDB_KEY) : null;
     if (db) db.close();
     db = bytes ? new SQL.Database(bytes) : new SQL.Database();
+    // Chụp lại trước khi nâng cấp dữ liệu đang có; lỗi chụp không chặn việc nâng cấp
+    // (mỗi bước nâng cấp đã chạy trong transaction, và lỗi thì không ghi gì vào IndexedDB)
+    if (bytes && persist && versionOf() < latest()) {
+      try { await snapshot('before-migrate'); } catch (err) { console.error(err); }
+    }
     prepare();
     changed();
     await flush();
@@ -357,7 +393,7 @@
       next.close();
       throw new Error('File sao lưu bị hỏng: ' + check);
     }
-    if (schemaOf(next) > SCHEMA_VERSION) {
+    if (schemaOf(next) > latest()) {
       next.close();
       throw new Error('File được tạo bởi phiên bản mới hơn của ứng dụng. Hãy cập nhật ứng dụng rồi nhập lại.');
     }
@@ -373,9 +409,16 @@
       next.close();
       throw err;
     }
-    db.close();
+    const prev = db;
     db = next;
-    prepare();
+    try {
+      prepare();
+    } catch (err) {
+      db = prev;
+      next.close();
+      throw err;
+    }
+    prev.close();
     changed();
     await flush();
   }
@@ -415,7 +458,7 @@
 
   T.db = {
     init, run, query, get, scalar, insert, tx, flush, dirty, onStatus, detach, exportBytes, importBytes, reset,
-    listSnapshots, restoreSnapshot, usage, SNAP_MAX,
+    listSnapshots, restoreSnapshot, usage, SNAP_MAX, schemaVersion: latest, MIGRATIONS,
     status: () => status
   };
 })(window.TSTB);
