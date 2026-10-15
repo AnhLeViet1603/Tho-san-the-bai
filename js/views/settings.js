@@ -172,12 +172,22 @@
         </div>
         <div><button class="btn">Lưu cài đặt</button></div>
       </form>`;
-    body.querySelector('#atpForm').onsubmit = e => {
+    body.querySelector('#atpForm').onsubmit = async e => {
       e.preventDefault();
       const els = e.target.elements;
       if (els.school_start.value >= els.school_end.value) {
         T.ui.toast('Ngày kết thúc năm học phải sau ngày bắt đầu', 'error');
         return;
+      }
+      const nextThreshold = Math.max(1, Math.trunc(Number(els.evolve_threshold.value) || 1));
+      if (nextThreshold !== T.evolutions.threshold()) {
+        const imp = T.evolutions.thresholdImpact(nextThreshold);
+        const parts = [];
+        if (imp.more) parts.push(`${imp.more} học sinh có thêm tổng cộng ${imp.extra} lượt lật thẻ`);
+        if (imp.over) parts.push(`${imp.over} học sinh thành ra đã lật nhiều thẻ hơn số lượt được hưởng (thẻ đã lật vẫn giữ nguyên, các em chỉ lật tiếp khi đủ ATP)`);
+        if (parts.length && !(await T.ui.confirm(
+          `Đổi mốc ATP từ ${T.evolutions.threshold()} thành ${nextThreshold} sẽ tính lại lượt lật cho cả năm học: ${parts.join('; ')}. Vẫn lưu?`,
+          { title: 'Đổi mốc ATP tiến hoá', okLabel: 'Vẫn lưu' }))) return;
       }
       T.db.tx(() => {
         T.schoolYear.set(els.school_start.value, els.school_end.value);
@@ -244,7 +254,7 @@
       if (btn.dataset.act === 'edit') return cardForm(c);
       const held = T.cards.holders(c.id);
       if (!(await T.ui.confirm(
-        `Xoá thẻ “${c.name}”?${held ? ` ${held} học sinh đang giữ thẻ này sẽ mất thẻ.` : ''} Lịch sử của thẻ cũng bị xoá.`,
+        `Xoá thẻ “${c.name}” khỏi bộ thẻ?${held ? ` ${held} học sinh đang giữ thẻ này sẽ mất thẻ, nhưng vẫn tính là đã lật (không được lật bù).` : ''} Lịch sử của thẻ được giữ lại.`,
         { danger: true, okLabel: 'Xoá' }))) return;
       T.cards.remove(c.id);
       refresh();

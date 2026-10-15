@@ -193,7 +193,7 @@ test('sang năm học mới: lượt lật tính lại từ 0 nhưng thẻ đang
   assert.equal(T.evolutions.heldBy(ids[0]).length, 1);
 });
 
-test('xoá một loại thẻ: mất cả lá đang giữ lẫn lịch sử, thẻ loại khác không ảnh hưởng', async () => {
+test('xoá một loại thẻ: lá đang giữ bị thu lại nhưng vẫn tính lượt lật, lịch sử giữ nguyên', async () => {
   const { T } = await boot();
   const { classId, ids } = seedClass(T);
   const [a, b] = T.cards.list();
@@ -204,8 +204,21 @@ test('xoá một loại thẻ: mất cả lá đang giữ lẫn lịch sử, th�
   assert.equal(T.cards.holders(a.id), 1, 'chỉ đếm lá đang giữ');
 
   T.cards.remove(a.id);
-  assert.deepEqual(T.evolutions.heldBy(ids[0]).map(c => c.id), [b.id]);
-  assert.deepEqual(T.evolutions.history(classId, 30), []);
+  assert.deepEqual(T.evolutions.heldBy(ids[0]).map(c => c.id), [b.id], 'thẻ loại khác không ảnh hưởng');
+  assert.equal(T.evolutions.flips(ids[0]), 2, 'lá bị thu lại vẫn tính là đã lật');
+  assert.equal(T.evolutions.flips(ids[1]), 1);
+  assert.ok(!T.cards.list().some(c => c.id === a.id), 'loại thẻ biến khỏi bộ thẻ');
+  assert.ok(!T.evolutions.available(ids[2]).some(c => c.id === a.id), 'không lật ra được nữa');
+  const hist = T.evolutions.history(classId, 30);
+  assert.equal(hist.length, 2, 'lịch sử còn nguyên (lá đã dùng + lá bị thu)');
+  assert.ok(hist.every(h => h.name === a.name));
+});
+
+test('xoá loại thẻ chưa từng phát: xoá hẳn', async () => {
+  const { T } = await boot();
+  const a = T.cards.list()[0];
+  T.cards.remove(a.id);
+  assert.equal(T.cards.get(a.id), null);
 });
 
 test('thu hồi một lượt lật trả lại lượt cho học sinh', async () => {

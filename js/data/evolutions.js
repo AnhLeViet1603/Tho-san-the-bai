@@ -53,9 +53,9 @@
   // Số lượt lật còn lại với tổng ATP của năm học và số lượt đã lật
   const pending = (total, done) => Math.max(0, Math.floor(total / threshold()) - (done || 0));
 
-  // Các thẻ học sinh chưa giữ (mỗi loại tối đa 1 lá)
+  // Các thẻ học sinh chưa giữ (mỗi loại tối đa 1 lá), bỏ loại đã xoá
   const available = studentId => T.db.query(`
-    SELECT * FROM cards WHERE id NOT IN (
+    SELECT * FROM cards WHERE archived = 0 AND id NOT IN (
       SELECT card_id FROM student_cards WHERE student_id = ? AND status = 'held')
     ORDER BY sort_order, id`, [studentId]);
 
@@ -75,6 +75,59 @@
     return true;
   }
 
+  // Lật thẻ thật sự (từ màn lật thẻ): kiểm tra lại mọi điều kiện ngay trong transaction, vì màn lật
+  // có thể đã mở từ trước khi ATP bị hoàn tác, thẻ bị xoá hay em đã lật ở chỗ khác.
+  // Trả về 'ok' | 'no-flip' (hết lượt) | 'held' (đang giữ loại này) | 'archived' (loại thẻ đã bị xoá)
+  function flip(studentId, card, when) {
+    return T.db.tx(() => {
+      const fresh = T.cards.get(card.id);
+      if (!fresh || fresh.archived) return 'archived';
+      if (!pending(T.atp.totalFor(studentId), flips(studentId))) return 'no-flip';
+      return grant(studentId, fresh, when) ? 'ok' : 'held';
+    });
+  }
+
+  // ---------- Cân đối lượt lật: số lượt được hưởng theo ATP so với số thẻ đã lật ----------
+  const allowed = (total, th) => Math.max(0, Math.floor(total / th));
+
+  // [{ id, name, total, flips }] của mọi học sinh trong năm học hiện tại
+  function balances() {
+    const r = T.schoolYear.range();
+    return T.db.query(`
+      SELECT s.id, s.name,
+        COALESCE((SELECT SUM(amount) FROM atp_events e
+          WHERE e.student_id = s.id AND e.created_at >= ? AND e.created_at < ?), 0) AS total,
+        (SELECT COUNT(*) FROM student_cards v
+          WHERE v.student_id = s.id AND v.granted_at >= ? AND v.granted_at < ?) AS flips
+      FROM students s ORDER BY s.class_id, s.sort_order, s.id`, [r.startSql, r.endSql, r.startMs, r.endMs]);
+  }
+
+  // Đổi mốc ATP thì lượt lật cả năm được tính lại. Trả về:
+  // more: số em có thêm lượt lật, extra: tổng số lượt thêm, over: số em thành ra đã lật nhiều hơn lượt được hưởng
+  function thresholdImpact(next) {
+    const cur = threshold();
+    const th = Math.max(1, Math.trunc(next) || 1);
+    const out = { more: 0, extra: 0, over: 0 };
+    balances().forEach(b => {
+      const before = Math.max(0, allowed(b.total, cur) - b.flips);
+      const after = Math.max(0, allowed(b.total, th) - b.flips);
+      if (after > before) { out.more++; out.extra += after - before; }
+      if (b.flips <= allowed(b.total, cur) && b.flips > allowed(b.total, th)) out.over++;
+    });
+    return out;
+  }
+
+  // deltas: { studentId: thay đổi ATP trong năm học }. Trả về [{ id, name }] các em sẽ thành ra
+  // đã lật nhiều thẻ hơn số lượt được hưởng (trước đó thì chưa).
+  function overdrawnIf(deltas) {
+    const ids = Object.keys(deltas).map(Number);
+    if (!ids.length) return [];
+    const th = threshold();
+    return balances().filter(b => ids.includes(b.id) &&
+      b.flips <= allowed(b.total, th) && b.flips > allowed(b.total + deltas[b.id], th))
+      .map(b => ({ id: b.id, name: b.name }));
+  }
+
   // Không được dùng thẻ ngay trong tuần nhận thẻ
   const sameWeek = (row, when) => row.year === when.year && row.month === when.month && row.week === when.week;
 
@@ -83,9 +136,12 @@
     [Date.now(), lessonId || null, grantId]);
 
   // Hoàn tác một lần dùng nhầm hoặc xoá nhầm; trả về false nếu học sinh đã có lại thẻ cùng loại
+  // hoặc loại thẻ đã bị xoá
   function unuse(grantId) {
     const row = T.db.get('SELECT * FROM student_cards WHERE id = ?', [grantId]);
     if (!row || holds(row.student_id, row.card_id)) return false;
+    const card = T.cards.get(row.card_id);
+    if (!card || card.archived) return false;
     T.db.run("UPDATE student_cards SET status = 'held', used_at = NULL, lesson_id = NULL WHERE id = ?", [grantId]);
     return true;
   }
@@ -117,7 +173,7 @@
   function swap(grantId, cardId) {
     const row = heldRow(grantId);
     const card = T.cards.get(cardId);
-    if (!row || !card || row.card_id === card.id || holds(row.student_id, card.id)) return false;
+    if (!row || !card || card.archived || row.card_id === card.id || holds(row.student_id, card.id)) return false;
     T.db.run('UPDATE student_cards SET card_id = ?, expires_at = ? WHERE id = ?', [card.id, expiryFor(card), grantId]);
     return true;
   }
@@ -138,6 +194,7 @@
 
   T.evolutions = {
     threshold, choices, purge, heldByClass, heldBy, flipsByClass, flips, pending, available,
-    grant, sameWeek, use, unuse, revoke, discard, setExpiry, swap, history, daysLeft, expiryText
+    grant, flip, sameWeek, use, unuse, revoke, discard, setExpiry, swap, history, daysLeft, expiryText,
+    balances, thresholdImpact, overdrawnIf
   };
 })(window.TSTB);

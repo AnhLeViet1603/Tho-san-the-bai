@@ -40,6 +40,16 @@
     </div>`;
   }
 
+  // Xoá lượt cộng mà làm có em đã lật nhiều thẻ hơn số lượt được hưởng thì hỏi lại (không chặn: có thể là bấm nhầm thật)
+  async function okToRemove(eventIds) {
+    const over = T.atp.removalImpact(eventIds);
+    if (!over.length) return true;
+    const names = over.slice(0, 5).map(s => s.name).join(', ') + (over.length > 5 ? ` và ${over.length - 5} em khác` : '');
+    return T.ui.confirm(`Bỏ lượt cộng này thì ${names} sẽ không còn đủ ATP cho số thẻ đã lật. ` +
+      'Thẻ đã lật vẫn giữ nguyên; các em chỉ lật tiếp khi ATP đủ trở lại. Vẫn bỏ?',
+    { title: 'ATP không còn đủ cho thẻ đã lật', okLabel: 'Vẫn bỏ' });
+  }
+
   function showHistory(lesson) {
     const rows = T.atp.history(lesson.id);
     const body = document.createElement('div');
@@ -54,10 +64,12 @@
         </tr>`).join('')}</tbody></table>`
       : '<p class="muted">Tiết này chưa có lượt cộng ATP nào.</p>';
     const m = T.ui.modal({ title: 'Lịch sử · ' + T.lessons.label(lesson), body, wide: true, onClose: () => T.router.refresh() });
-    body.onclick = e => {
+    body.onclick = async e => {
       const b = e.target.closest('[data-del]');
       if (!b) return;
-      T.atp.removeEvent(Number(b.dataset.del));
+      const id = Number(b.dataset.del);
+      if (!(await okToRemove([id]))) return;
+      T.atp.removeEvent(id);
       m.close();
       showHistory(lesson);
     };
@@ -173,12 +185,13 @@
 
     T.picker.bind(el);
 
-    el.querySelector('.page-head').onclick = e => {
+    el.querySelector('.page-head').onclick = async e => {
       const m = e.target.closest('[data-mode]');
       if (m) { mode = m.dataset.mode; return T.router.refresh(); }
       const b = e.target.closest('[data-head]');
       if (!b) return;
       if (b.dataset.head === 'history') return showHistory(lesson);
+      if (!(await okToRemove(T.atp.lastBatchIds(lesson.id)))) return;
       const n = T.atp.undoLast(lesson.id);
       T.ui.toast(n ? `Đã hoàn tác ${n} lượt cộng` : 'Không có gì để hoàn tác', n ? '' : 'warn');
       T.router.refresh();

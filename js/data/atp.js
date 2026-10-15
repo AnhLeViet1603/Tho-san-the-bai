@@ -57,6 +57,24 @@
     return n;
   }
 
+  // Id các sự kiện của lượt cộng gần nhất trong tiết (lượt mà undoLast sẽ xoá)
+  function lastBatchIds(lessonId) {
+    const last = T.db.get('SELECT batch_id FROM atp_events WHERE lesson_id = ? ORDER BY id DESC LIMIT 1', [lessonId]);
+    if (!last) return [];
+    return T.db.query('SELECT id FROM atp_events WHERE lesson_id = ? AND batch_id = ?', [lessonId, last.batch_id]).map(r => r.id);
+  }
+
+  // Xoá các sự kiện này thì những em nào thành ra đã lật nhiều thẻ hơn số lượt được hưởng? [{ id, name }]
+  function removalImpact(eventIds) {
+    if (!eventIds.length) return [];
+    const r = T.schoolYear.range();
+    const deltas = {};
+    T.db.query(`SELECT student_id, SUM(amount) AS s FROM atp_events
+      WHERE id IN (${eventIds.map(() => '?').join(',')}) AND created_at >= ? AND created_at < ? GROUP BY student_id`,
+    [...eventIds, r.startSql, r.endSql]).forEach(row => { deltas[row.student_id] = -row.s; });
+    return T.evolutions.overdrawnIf(deltas);
+  }
+
   const history = lessonId => T.db.query(`
     SELECT e.*, s.name AS student_name, g.name AS group_name
     FROM atp_events e
@@ -66,5 +84,7 @@
 
   const removeEvent = id => T.db.run('DELETE FROM atp_events WHERE id = ?', [id]);
 
-  T.atp = { TYPES, amountFor, award, totalsByClass, totalFor, totalsByLesson, undoLast, history, removeEvent };
+  T.atp = {
+    TYPES, amountFor, award, totalsByClass, totalFor, totalsByLesson, undoLast, lastBatchIds, removalImpact, history, removeEvent
+  };
 })(window.TSTB);

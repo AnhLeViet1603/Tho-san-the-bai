@@ -114,10 +114,11 @@ test('bước nâng cấp lỗi: rollback bước đó, báo lỗi, không ghi �
   const steps = [...T.db.MIGRATIONS,
     d => d.run('CREATE TABLE extra_ok (x)'),
     d => { d.run('CREATE TABLE half_done (x)'); throw new Error('hỏng giữa chừng'); }];
-  await assert.rejects(T.db.init({ storage, migrations: steps }), /phiên bản 3: hỏng giữa chừng/);
+  const n = T.db.MIGRATIONS.length;
+  await assert.rejects(T.db.init({ storage, migrations: steps }), new RegExp(`phiên bản ${n + 2}: hỏng giữa chừng`));
   assert.equal(storage.data, saved, 'IndexedDB giữ nguyên bản trước khi nâng cấp');
   assert.equal(hasTable(T, 'half_done'), false, 'bước lỗi được rollback');
-  assert.equal(userVersion(T), 2, 'các bước trước đó vẫn đã chạy trong bộ nhớ');
+  assert.equal(userVersion(T), n + 1, 'các bước trước đó vẫn đã chạy trong bộ nhớ');
   assert.ok((await T.db.listSnapshots()).some(s => s.reason === 'before-migrate'));
 });
 
@@ -147,9 +148,10 @@ test('nhập file mà bước nâng cấp lỗi: giữ nguyên dữ liệu đang
   const steps = [...T.db.MIGRATIONS, d => d.run('CREATE TABLE extra (x)')];
   await T.db.init({ storage: fakeStorage(), migrations: steps });
   addClass(T, 'Lop-Hien-Tai');
-  // File ở phiên bản 1 nhưng đã có sẵn bảng extra nên bước 2 sẽ lỗi
-  const bad = await dbBytes(T, d => { d.run('PRAGMA user_version = 1'); d.run("UPDATE classes SET name = 'Lop-File'"); });
-  await assert.rejects(T.db.importBytes(bad), /phiên bản 2/);
+  // File ở phiên bản ngay trước bước extra nhưng đã có sẵn bảng extra nên bước đó sẽ lỗi
+  const n = T.db.MIGRATIONS.length;
+  const bad = await dbBytes(T, d => { d.run(`PRAGMA user_version = ${n}`); d.run("UPDATE classes SET name = 'Lop-File'"); });
+  await assert.rejects(T.db.importBytes(bad), new RegExp(`phiên bản ${n + 1}`));
   assert.deepEqual(names(T), ['Lop-Hien-Tai']);
   addClass(T, 'Lop-2');
   assert.deepEqual(names(T), ['Lop-Hien-Tai', 'Lop-2'], 'DB vẫn dùng được');

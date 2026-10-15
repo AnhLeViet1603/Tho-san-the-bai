@@ -230,6 +230,7 @@
   // ---------- Nâng cấp cấu trúc dữ liệu ----------
   // Mỗi bước nâng DB từ phiên bản i lên i + 1 (PRAGMA user_version), nhận DB sql.js. Chỉ THÊM bước mới vào cuối,
   // không sửa bước đã phát hành: DB của người dùng có thể đang ở bất kỳ phiên bản nào trước đó.
+  // Viết mỗi bước sao cho chạy lại lần nữa cũng không hỏng (IF NOT EXISTS, kiểm tra cột trước khi ALTER).
   const MIGRATIONS = [
     // 1: cấu trúc của bản 1.0.0 – 1.1.x (các bản này chưa ghi user_version nên DB của chúng có user_version = 0).
     // Bổ sung luôn những gì bản thử nghiệm trước 1.0.0 còn thiếu.
@@ -245,6 +246,18 @@
           SELECT student_id, card_id, ?, CASE WHEN used THEN 'used' ELSE 'held' END, ?, ?, CASE WHEN used THEN ? END
           FROM evolutions`, [T.time.parts().year, now, now + 30 * T.time.DAY, now]);
         db.run('DROP TABLE evolutions');
+      }
+    },
+
+    // 2: mỗi học sinh giữ tối đa 1 lá mỗi loại do DB đảm bảo; loại thẻ bị xoá thì chỉ ẩn (archived)
+    d => {
+      // Dữ liệu cũ lỡ có lá trùng: giữ lá nhận trước, lá còn lại coi như giáo viên đã xoá (vẫn tính lượt lật)
+      d.run(`UPDATE student_cards SET status = 'removed', used_at = COALESCE(used_at, ?)
+        WHERE status = 'held' AND id NOT IN (
+          SELECT MIN(id) FROM student_cards WHERE status = 'held' GROUP BY student_id, card_id)`, [Date.now()]);
+      d.run("CREATE UNIQUE INDEX IF NOT EXISTS ux_student_cards_held ON student_cards (student_id, card_id) WHERE status = 'held'");
+      if (!query('PRAGMA table_info(cards)').some(c => c.name === 'archived')) {
+        d.run('ALTER TABLE cards ADD COLUMN archived INTEGER NOT NULL DEFAULT 0');
       }
     }
   ];

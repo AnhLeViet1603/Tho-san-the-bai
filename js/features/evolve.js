@@ -12,6 +12,13 @@
     return a;
   }
 
+  // Lý do không lật được (màn lật mở từ trước, dữ liệu đã đổi ở chỗ khác)
+  const FLIP_FAIL = {
+    'no-flip': s => `${s.name} không còn lượt lật thẻ (ATP vừa thay đổi)`,
+    held: (s, c) => `${s.name} đang giữ thẻ ${c.name} rồi`,
+    archived: (s, c) => `Thẻ ${c.name} vừa bị xoá khỏi bộ thẻ. Hãy lật lại.`
+  };
+
   // Tuần của tiết đang chọn: dùng cho luật "không dùng trong tuần nhận thẻ"
   const now = () => {
     const s = T.store.state;
@@ -67,7 +74,11 @@
       if (picked) return;
       picked = true;
       const card = picks[Number(el.dataset.i)];
-      if (!T.evolutions.grant(student.id, card, when)) return close();
+      const result = T.evolutions.flip(student.id, card, when);
+      if (result !== 'ok') {
+        T.ui.toast(FLIP_FAIL[result](student, card), 'warn');
+        return close();
+      }
 
       // Đưa thẻ được chọn về giữa màn hình và phóng to
       const r = el.getBoundingClientRect();

@@ -5,7 +5,8 @@
   const ICONS = ['🦠', '🧫', '🪸', '🍄', '🌱', '🐛', '🦋', '🐟', '🐸', '🦎', '🐢', '🦖',
     '🦕', '🦅', '🦉', '🐺', '🦊', '🐘', '🦧', '🧬', '⚡', '🔥', '🛡️', '👑'];
 
-  const list = () => T.db.query('SELECT * FROM cards ORDER BY sort_order, id');
+  // Chỉ các loại thẻ đang dùng; loại đã xoá (archived) vẫn còn trong DB để lịch sử hiển thị được
+  const list = () => T.db.query('SELECT * FROM cards WHERE archived = 0 ORDER BY sort_order, id');
   const get = id => T.db.get('SELECT * FROM cards WHERE id = ?', [id]);
 
   // expire_days = 0: thẻ không hết hạn
@@ -22,11 +23,16 @@
       [...vals, order]);
   }
 
-  // Xoá thẻ kéo theo mọi lá học sinh đang giữ và lịch sử của thẻ đó
+  // Xoá loại thẻ: các lá học sinh đang giữ bị thu lại nhưng vẫn tính là đã lật (không ai được lật thêm),
+  // lịch sử giữ nguyên. Loại thẻ chưa từng được phát thì xoá hẳn.
   function remove(id) {
     T.db.tx(() => {
-      T.db.run('DELETE FROM student_cards WHERE card_id = ?', [id]);
-      T.db.run('DELETE FROM cards WHERE id = ?', [id]);
+      if (!T.db.scalar('SELECT 1 FROM student_cards WHERE card_id = ? LIMIT 1', [id])) {
+        T.db.run('DELETE FROM cards WHERE id = ?', [id]);
+        return;
+      }
+      T.db.run("UPDATE student_cards SET status = 'removed', used_at = ? WHERE card_id = ? AND status = 'held'", [Date.now(), id]);
+      T.db.run('UPDATE cards SET archived = 1 WHERE id = ?', [id]);
     });
   }
 
