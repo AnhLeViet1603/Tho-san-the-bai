@@ -94,5 +94,5 @@
     return true;
   }
 
-  T.backup = { exportFile, importFile, chooseFile, lastBackup, reminder, snooze, reminderHtml, onReminderClick, REMIND_AFTER };
+  T.backup = { exportFile, importFile, chooseFile, lastBackup, reminder, snooze, reminderHtml, onReminderClick };
 })(window.TSTB);

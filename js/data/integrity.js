@@ -33,8 +33,6 @@
       where: `status NOT IN (${inList(STATUSES)})`, fix: "status = 'removed'" }
   ];
 
-  let last = null;
-
   const whereOf = r => (typeof r.where === 'function' ? r.where() : r.where);
 
   // { ok, fileError, issues: [{ key, label, count }] } — fileError: kết quả PRAGMA integrity_check nếu khác 'ok'
@@ -45,9 +43,7 @@
     const issues = RULES.map(r => ({
       key: r.key, label: r.label, count: T.db.scalar(`SELECT COUNT(*) FROM ${r.table} WHERE ${whereOf(r)}`)
     })).filter(i => i.count > 0);
-    const out = { ok: !fileError && !issues.length, fileError, issues };
-    last = out;
-    return out;
+    return { ok: !fileError && !issues.length, fileError, issues };
   }
 
   // Sửa mọi lỗi sửa được (xoá bản ghi mồ côi, đưa giá trị lạ về mặc định). Chụp lại dữ liệu trước khi sửa;
@@ -76,5 +72,5 @@
     return fixed;
   }
 
-  T.integrity = { check, repair, last: () => last, STATUSES };
+  T.integrity = { check, repair };
 })(window.TSTB);
