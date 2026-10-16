@@ -22,6 +22,8 @@ const total = id => ev(`TSTB.atp.totalFor(${id})`);
 
 await send('Page.navigate', { url: APP });
 check('ứng dụng mở được', await waitFor("!document.getElementById('app').hidden"));
+await waitFor("!!document.querySelector('.welcome-modal')", 3000);
+await ev("document.querySelector('.welcome-modal [data-x]').click()"); // hồ sơ trình duyệt mới: đóng hộp chào
 
 // Dữ liệu: 1 lớp, An 50 ATP đã lật 1 thẻ, Bình 100 ATP chưa lật (mốc 50)
 const [an, binh] = await ev(`(() => {

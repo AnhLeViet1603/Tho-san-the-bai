@@ -99,6 +99,7 @@ node tests/ui/tab-lock-ui.mjs
 node tests/ui/save-ui.mjs
 node tests/ui/rules-ui.mjs
 node tests/ui/file-sink-ui.mjs
+node tests/ui/backup-ui.mjs
 
 # Thử tay quyền ghi file (hộp hỏi quyền không tự động hoá được): mở tests/manual/fs-probe.html
 ```

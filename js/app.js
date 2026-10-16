@@ -86,6 +86,39 @@
   };
   T.fileSink.init().catch(err => console.error(err));
 
+  // Lần đầu mở trên trình duyệt này (hoặc dữ liệu trình duyệt vừa bị xoá): mời nhập file sao lưu
+  // thay vì âm thầm bắt đầu với dữ liệu trống
+  if (T.db.fresh()) welcome();
+
+  function welcome() {
+    const m = T.ui.modal({
+      title: '🧬 Chào mừng tới Thợ Săn Thẻ Bài',
+      body: `<div class="welcome">
+        <p>Trình duyệt này chưa có dữ liệu của ứng dụng.</p>
+        <p><b>Đã từng dùng rồi?</b> (ở máy khác, trình duyệt khác, hoặc dữ liệu trình duyệt vừa bị xoá) — hãy nhập
+          <b>file sao lưu</b> hoặc <b>file tự lưu</b> (.sqlite) để lấy lại toàn bộ lớp, học sinh, ATP và thẻ.</p>
+        <p class="muted">Dùng lần đầu thì chọn “Bắt đầu mới” rồi tạo lớp trong Cài đặt.</p>
+      </div>`,
+      actions: [
+        { label: 'Bắt đầu mới', kind: 'ghost', onClick: close => close() },
+        { label: '📥 Nhập file sao lưu', onClick: async close => {
+          const file = await T.backup.chooseFile();
+          if (!file) return;
+          try {
+            await T.backup.importFile(file);
+            T.audit.log('data.import', `Nhập file ${file.name} (lần đầu mở trên trình duyệt này)`);
+            T.ui.toast('Đã nhập dữ liệu từ ' + file.name);
+            close();
+            T.router.refresh();
+          } catch (err) {
+            T.ui.toast(err.message || 'Không nhập được file', 'error');
+          }
+        } }
+      ]
+    });
+    m.el.classList.add('welcome-modal');
+  }
+
   // Xin trình duyệt không tự dọn dữ liệu khi máy thiếu dung lượng
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
 

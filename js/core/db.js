@@ -89,6 +89,7 @@
   let saving = null;
   let failures = 0;
   let status = 'saved'; // saved | pending | saving | error
+  let fresh = false;    // lần mở này tạo DB mới vì trình duyệt chưa có dữ liệu (lần đầu, hoặc dữ liệu vừa bị xoá)
   const listeners = [];
   const savedListeners = []; // gọi sau mỗi lần ghi IndexedDB thành công (tự lưu ra file nối vào đây)
 
@@ -356,6 +357,7 @@
     migrations = opts.migrations || MIGRATIONS;
     if (!SQL) SQL = await initSqlJs();
     const bytes = persist ? await storage.get(IDB_KEY) : null;
+    fresh = persist && !bytes;
     if (db) db.close();
     db = bytes ? new SQL.Database(bytes) : new SQL.Database();
     // Chụp lại trước khi nâng cấp dữ liệu đang có; lỗi chụp không chặn việc nâng cấp
@@ -529,6 +531,7 @@
   T.db = {
     init, run, query, get, scalar, insert, tx, flush, dirty, onStatus, detach, exportBytes, importBytes, reset,
     listSnapshots, restoreSnapshot, guard, usage, kv, onSaved, writable: () => persist, SNAP_MAX, schemaVersion: latest, MIGRATIONS,
-    status: () => status
+    status: () => status,
+    fresh: () => fresh
   };
 })(window.TSTB);

@@ -108,6 +108,17 @@ await waitFor("document.getElementById('app') && !document.getElementById('app')
 // ============================================================
 await group('1. Khởi động', async () => {
   check('ứng dụng mở được qua file://', await ev("!document.getElementById('app').hidden"));
+  check('lần đầu mở: hộp chào mời nhập file sao lưu', await waitFor("!!document.querySelector('.welcome-modal')", 3000) &&
+    /Nhập file sao lưu/.test(await text('.welcome-modal footer')) && /Bắt đầu mới/.test(await text('.welcome-modal footer')));
+  await shot('01-hop-chao');
+  await ev("[...document.querySelectorAll('.welcome-modal footer .btn')].find(b => /Bắt đầu mới/.test(b.innerText)).click()");
+  await sleep(200);
+  check('"Bắt đầu mới" đóng hộp chào', await count('.modal-wrap') === 0);
+  await ev('TSTB.db.flush()');
+  await send('Page.reload');
+  await waitFor("document.getElementById('app') && !document.getElementById('app').hidden", 20000);
+  await sleep(300);
+  check('mở lại: không hiện hộp chào nữa', await count('.welcome-modal') === 0);
   check('footer ghi số phiên bản', /^Thợ Săn Thẻ Bài v\d+\.\d+\.\d+$/.test((await text('.side-ver')).trim()), await text('.side-ver'));
   check('trạng thái trống ở Khu rừng', /Khu rừng còn trống/.test(await text('.view')));
   check('thanh điều hướng có 5 mục, không còn tab Chia nhóm', await count('#nav a') === 5 && !/Chia nhóm/.test(await text('#nav')));

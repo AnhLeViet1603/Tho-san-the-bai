@@ -30,7 +30,8 @@ const FILES = [
   'js/data/stats.js',
   'js/data/integrity.js',
   'js/features/award.js',
-  'js/features/excel-import.js'
+  'js/features/excel-import.js',
+  'js/features/backup.js'
 ];
 
 const DAY = 86400000;

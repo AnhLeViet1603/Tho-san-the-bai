@@ -376,7 +376,7 @@
   function tabData(body) {
     const tabs = subTabs('data', [['backup', '⬇ Sao lưu'], ['snaps', '📸 Bản chụp'], ['audit', '📜 Nhật ký'], ['danger', '⚠ Xoá dữ liệu']]);
     const SECTIONS = {
-      backup: () => `
+      backup: () => `${T.backup.reminderHtml()}
       <h2>Sao lưu & khôi phục</h2>
       <p class="muted">Dữ liệu được lưu trong trình duyệt này (IndexedDB), gắn với vị trí thư mục của ứng dụng.
         Hãy xuất file <b>.sqlite</b> định kỳ để sao lưu, hoặc khi đổi máy, đổi trình duyệt, di chuyển thư mục.</p>
@@ -439,9 +439,10 @@
       refresh();
     };
     body.onclick = async e => {
+      if (T.backup.onReminderClick(e)) return;
       const btn = e.target.closest('[data-act]');
       if (!btn) return;
-      if (btn.dataset.act === 'export') return T.backup.exportFile();
+      if (btn.dataset.act === 'export') { T.backup.exportFile(); return refresh(); }
       if (btn.dataset.act === 'restore') return restore(btn.dataset.key, btn.dataset.label);
       if (btn.dataset.act === 'repair') return repair();
       if (btn.dataset.act.startsWith('sink-')) return sinkAction(btn.dataset.act);
