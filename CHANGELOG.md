@@ -37,6 +37,7 @@ Bản này tập trung vào việc **không làm mất dữ liệu** và **khôi
 ### Giao diện
 
 - Cài đặt → Lớp học, Học sinh, Thẻ tiến hoá và Dữ liệu được chia thành các tab con cho gọn.
+- Trang giới thiệu có thêm mục "Không sợ mất dữ liệu, không sợ bấm nhầm" và các câu hỏi về xoá dữ liệu trình duyệt, xoá nhầm.
 
 ### Ghi chú nâng cấp
 
