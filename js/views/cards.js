@@ -8,7 +8,17 @@
   const RESULT = {
     used: '<span class="atp">Đã dùng</span>',
     expired: '<span class="muted">Hết hạn, tự xoá</span>',
-    removed: '<span class="muted">Giáo viên xoá</span>'
+    removed: '<span class="muted">Giáo viên xoá</span>',
+    revoked: '<span class="muted">Giáo viên xoá, trả lại lượt lật</span>'
+  };
+
+  // Lý do không hoàn tác được (T.evolutions.restoreBlock)
+  const BLOCKED = {
+    held: 'học sinh đang giữ một lá cùng loại',
+    archived: 'loại thẻ này đang ở thùng rác (Cài đặt → Thẻ tiến hoá → Thùng rác)',
+    'no-flip': 'học sinh đã dùng lượt được trả lại để lật thẻ khác',
+    expired: 'thẻ đã hết hạn',
+    missing: 'không tìm thấy lượt này'
   };
 
   function render(el) {
@@ -70,9 +80,10 @@
     el.addEventListener('click', e => {
       const btn = e.target.closest('[data-act]');
       if (btn && btn.dataset.act === 'unuse') {
-        if (!T.evolutions.unuse(Number(btn.closest('tr').dataset.grant))) {
-          T.ui.toast('Không hoàn tác được: học sinh đang giữ một lá cùng loại', 'warn');
-        }
+        const id = Number(btn.closest('tr').dataset.grant);
+        const why = T.evolutions.restoreBlock(id);
+        if (why) T.ui.toast('Không hoàn tác được: ' + BLOCKED[why], 'warn');
+        else T.evolutions.unuse(id);
         return refresh();
       }
       const row = e.target.closest('tr[data-id]');

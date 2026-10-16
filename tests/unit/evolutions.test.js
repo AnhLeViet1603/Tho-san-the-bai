@@ -214,10 +214,12 @@ test('xoá một loại thẻ: lá đang giữ bị thu lại nhưng vẫn tính
   assert.ok(hist.every(h => h.name === a.name));
 });
 
-test('xoá loại thẻ chưa từng phát: xoá hẳn', async () => {
+test('xoá loại thẻ chưa từng phát: vào thùng rác, xoá vĩnh viễn được', async () => {
   const { T } = await boot();
   const a = T.cards.list()[0];
   T.cards.remove(a.id);
+  assert.ok(T.cards.trash().some(c => c.id === a.id));
+  assert.equal(T.cards.purge(a.id), true);
   assert.equal(T.cards.get(a.id), null);
 });
 

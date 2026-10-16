@@ -108,13 +108,14 @@ test('các thao tác sửa thẻ của học sinh đều được ghi, thao tác
   assert.equal(T.cards.named('Thẻo'), 'thẻ Thẻo');
 });
 
-test('xoá học sinh / xoá cả lớp học sinh được ghi', async () => {
+test('xoá học sinh / xoá cả lớp học sinh / xoá vĩnh viễn được ghi', async () => {
   const { T, a, b } = await twoClasses();
   T.students.remove(a.ids[0]);
   T.students.removeAll(b.classId);
   T.students.removeAll(b.classId); // lớp đã trống: không ghi thêm
-  assert.deepEqual(actions(T), ['student.delete', 'student.delete_all']);
-  assert.match(T.audit.list(2)[1].summary, /Xoá học sinh An \(60 ATP năm học, 1 lượt lật thẻ\)/);
+  T.students.purge(a.ids[0]);
+  assert.deepEqual(actions(T), ['student.archive', 'student.archive_all', 'student.delete']);
+  assert.equal(T.audit.list(1)[0].summary, 'Xoá vĩnh viễn học sinh An (60 ATP, 1 lượt lật thẻ)');
 });
 
 test(`nhật ký chỉ giữ ${2000} dòng mới nhất`, async () => {

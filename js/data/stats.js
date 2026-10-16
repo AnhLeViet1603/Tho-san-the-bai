@@ -5,7 +5,7 @@
   const FROM = `
     FROM atp_events e
     JOIN lessons l ON l.id = e.lesson_id
-    JOIN students s ON s.id = e.student_id
+    JOIN students s ON s.id = e.student_id AND s.archived_at IS NULL
     JOIN classes c ON c.id = e.class_id AND c.archived_at IS NULL`;
 
   // filter: { classIds[], scope ('school' = năm học hiện tại), year, month, week, period, type, source, studentId }
@@ -73,7 +73,7 @@
 
   // Số lượt lật theo từng loại thẻ (lọc theo lớp, năm, học sinh)
   function evolution(f) {
-    const w = ['s.class_id IN (SELECT id FROM classes WHERE archived_at IS NULL)'];
+    const w = ['s.class_id IN (SELECT id FROM classes WHERE archived_at IS NULL)', "v.status != 'revoked'"];
     const p = [];
     if (f.classIds && f.classIds.length) {
       w.push(`s.class_id IN (${f.classIds.map(() => '?').join(',')})`);
@@ -90,7 +90,7 @@
       SELECT k.name AS key, COUNT(*) AS total, SUM(v.status = 'used') AS used
       FROM student_cards v
       JOIN cards k ON k.id = v.card_id
-      JOIN students s ON s.id = v.student_id
+      JOIN students s ON s.id = v.student_id AND s.archived_at IS NULL
       WHERE ${w.join(' AND ')} GROUP BY k.id ORDER BY total DESC`, p);
     return {
       rows,

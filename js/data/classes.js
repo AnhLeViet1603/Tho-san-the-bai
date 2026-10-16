@@ -10,9 +10,10 @@
     const r = T.schoolYear.range();
     return T.db.query(`
       SELECT c.*,
-        (SELECT COUNT(*) FROM students s WHERE s.class_id = c.id AND s.active = 1) AS student_count,
+        (SELECT COUNT(*) FROM students s WHERE s.class_id = c.id AND s.active = 1 AND s.archived_at IS NULL) AS student_count,
         (SELECT COALESCE(SUM(e.amount), 0) FROM atp_events e
-          WHERE e.class_id = c.id AND e.created_ms >= ? AND e.created_ms < ?) AS atp_total
+          WHERE e.class_id = c.id AND e.created_ms >= ? AND e.created_ms < ?
+            AND e.student_id NOT IN (SELECT id FROM students WHERE archived_at IS NOT NULL)) AS atp_total
       FROM classes c WHERE c.archived_at IS NULL ORDER BY c.sort_order, c.id`, [r.startMs, r.endMs]);
   }
 

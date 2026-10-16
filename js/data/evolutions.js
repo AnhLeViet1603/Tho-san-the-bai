@@ -25,7 +25,7 @@
   // { studentId: [thẻ đang giữ] }
   function heldByClass(classId) {
     const map = {};
-    T.db.query(`${SELECT} JOIN students s ON s.id = v.student_id
+    T.db.query(`${SELECT} JOIN students s ON s.id = v.student_id AND s.archived_at IS NULL
       WHERE s.class_id = ? AND v.status = 'held' ORDER BY v.id`, [classId])
       .forEach(r => { (map[r.student_id] = map[r.student_id] || []).push(r); });
     return map;
@@ -33,20 +33,22 @@
 
   const heldBy = studentId => T.db.query(`${SELECT} WHERE v.student_id = ? AND v.status = 'held' ORDER BY v.id`, [studentId]);
 
-  // Số lượt đã lật trong năm học hiện tại (kể cả thẻ đã dùng / hết hạn)
+  // Số lượt đã lật trong năm học hiện tại (kể cả thẻ đã dùng / hết hạn / bị xoá không trả lượt;
+  // trừ lá bị xoá kiểu "trả lại lượt lật" — status 'revoked')
   function flipsByClass(classId) {
     const r = T.schoolYear.range();
     const map = {};
     T.db.query(`
       SELECT v.student_id, COUNT(*) AS n FROM student_cards v JOIN students s ON s.id = v.student_id
-      WHERE s.class_id = ? AND v.granted_at >= ? AND v.granted_at < ? GROUP BY v.student_id`,
+      WHERE s.class_id = ? AND v.status != 'revoked' AND v.granted_at >= ? AND v.granted_at < ? GROUP BY v.student_id`,
       [classId, r.startMs, r.endMs]).forEach(row => { map[row.student_id] = row.n; });
     return map;
   }
 
   function flips(studentId) {
     const r = T.schoolYear.range();
-    return T.db.scalar('SELECT COUNT(*) FROM student_cards WHERE student_id = ? AND granted_at >= ? AND granted_at < ?',
+    return T.db.scalar(`SELECT COUNT(*) FROM student_cards
+      WHERE student_id = ? AND status != 'revoked' AND granted_at >= ? AND granted_at < ?`,
       [studentId, r.startMs, r.endMs]);
   }
 
@@ -98,8 +100,8 @@
         COALESCE((SELECT SUM(amount) FROM atp_events e
           WHERE e.student_id = s.id AND e.created_ms >= ? AND e.created_ms < ?), 0) AS total,
         (SELECT COUNT(*) FROM student_cards v
-          WHERE v.student_id = s.id AND v.granted_at >= ? AND v.granted_at < ?) AS flips
-      FROM students s WHERE s.class_id IN (SELECT id FROM classes WHERE archived_at IS NULL)
+          WHERE v.student_id = s.id AND v.status != 'revoked' AND v.granted_at >= ? AND v.granted_at < ?) AS flips
+      FROM students s WHERE s.archived_at IS NULL AND s.class_id IN (SELECT id FROM classes WHERE archived_at IS NULL)
       ORDER BY s.class_id, s.sort_order, s.id`, [r.startMs, r.endMs, r.startMs, r.endMs]);
   }
 
@@ -143,24 +145,37 @@
     "UPDATE student_cards SET status = 'used', used_at = ?, lesson_id = ? WHERE id = ? AND status = 'held'",
     [Date.now(), lessonId || null, grantId]);
 
-  // Hoàn tác một lần dùng nhầm hoặc xoá nhầm; trả về false nếu học sinh đã có lại thẻ cùng loại
-  // hoặc loại thẻ đã bị xoá
-  function unuse(grantId) {
+  // Vì sao không hoàn tác được lá này? null nếu được.
+  // 'missing' | 'expired' | 'archived' (loại thẻ đang trong thùng rác) | 'held' (đang giữ lá cùng loại)
+  // | 'no-flip' (lá "trả lại lượt lật" mà học sinh đã dùng lượt đó để lật thẻ khác)
+  function restoreBlock(grantId) {
     const row = T.db.get('SELECT * FROM student_cards WHERE id = ?', [grantId]);
-    if (!row || holds(row.student_id, row.card_id)) return false;
+    if (!row || row.status === 'held') return 'missing';
+    if (row.status === 'expired') return 'expired';
     const card = T.cards.get(row.card_id);
-    if (!card || card.archived) return false;
+    if (!card || card.archived) return 'archived';
+    if (holds(row.student_id, row.card_id)) return 'held';
+    if (row.status === 'revoked' && !pending(T.atp.totalFor(row.student_id), flips(row.student_id))) return 'no-flip';
+    return null;
+  }
+
+  // Hoàn tác một lần dùng nhầm hoặc xoá nhầm (lá trở về "đang giữ"); false nếu không được — lý do: restoreBlock()
+  function unuse(grantId) {
+    if (restoreBlock(grantId)) return false;
+    const row = T.db.get('SELECT * FROM student_cards WHERE id = ?', [grantId]);
+    const from = { used: '(đã dùng → đang giữ)', revoked: '(xoá có trả lượt → đang giữ)' }[row.status] || '(→ đang giữ)';
     T.db.tx(() => {
-      logCard('card.unuse', 'Hoàn tác', grantId, row.status === 'used' ? '(đã dùng → đang giữ)' : '(→ đang giữ)');
+      logCard('card.unuse', 'Hoàn tác', grantId, from);
       T.db.run("UPDATE student_cards SET status = 'held', used_at = NULL, lesson_id = NULL WHERE id = ?", [grantId]);
     });
     return true;
   }
 
-  // Thu hồi: xoá hẳn lượt lật, học sinh được lật lại
+  // Thu hồi: lá không còn tính là đã lật (học sinh được lật lại) nhưng vẫn nằm trong lịch sử để hoàn tác
   const revoke = grantId => T.db.tx(() => {
+    if (!T.db.scalar("SELECT 1 FROM student_cards WHERE id = ? AND status != 'revoked'", [grantId])) return;
     logCard('card.revoke', 'Xoá', grantId, '(trả lại lượt lật)');
-    T.db.run('DELETE FROM student_cards WHERE id = ?', [grantId]);
+    T.db.run("UPDATE student_cards SET status = 'revoked', used_at = ? WHERE id = ?", [Date.now(), grantId]);
   });
 
   // Giáo viên xoá thẻ nhưng không trả lại lượt lật; vẫn nằm trong lịch sử để hoàn tác
@@ -202,7 +217,7 @@
   }
 
   const history = (classId, limit) => T.db.query(`
-    SELECT h.*, s.name AS student_name FROM (${SELECT}) h JOIN students s ON s.id = h.student_id
+    SELECT h.*, s.name AS student_name FROM (${SELECT}) h JOIN students s ON s.id = h.student_id AND s.archived_at IS NULL
     WHERE s.class_id = ? AND h.status != 'held'
     ORDER BY COALESCE(h.used_at, h.expires_at) DESC LIMIT ?`, [classId, limit || 30]);
 
@@ -217,7 +232,7 @@
 
   T.evolutions = {
     threshold, choices, purge, heldByClass, heldBy, flipsByClass, flips, pending, available,
-    grant, flip, sameWeek, use, unuse, revoke, discard, setExpiry, swap, history, daysLeft, expiryText,
+    grant, flip, sameWeek, use, unuse, restoreBlock, revoke, discard, setExpiry, swap, history, daysLeft, expiryText,
     balances, thresholdImpact, overdrawnIf
   };
 })(window.TSTB);

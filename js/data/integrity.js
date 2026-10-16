@@ -3,7 +3,7 @@
 (function (T) {
   'use strict';
 
-  const STATUSES = ['held', 'used', 'expired', 'removed'];
+  const STATUSES = ['held', 'used', 'expired', 'removed', 'revoked'];
   const inList = list => list.map(s => `'${s}'`).join(', ');
   const missing = (table, col) => `${col} NOT IN (SELECT id FROM ${table})`;
 

@@ -100,7 +100,8 @@
             if (!names.length) { T.ui.toast('Chưa có tên nào để import', 'warn'); return; }
             const replace = $('mode').value === 'replace';
             if (replace && !(await T.ui.confirm(
-              `Thay thế sẽ XOÁ toàn bộ học sinh hiện có của lớp ${cls.name} cùng ATP của các em. Tiếp tục?`,
+              `Thay thế sẽ chuyển toàn bộ học sinh hiện có của lớp ${cls.name} vào thùng rác (ATP, thẻ của các em còn nguyên, ` +
+              'khôi phục được ở Cài đặt → Học sinh → Thùng rác). Tiếp tục?',
               { danger: true, okLabel: 'Thay thế' }))) return;
             T.db.tx(() => {
               if (replace) T.students.removeAll(classId);
