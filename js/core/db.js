@@ -283,6 +283,25 @@
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         at INTEGER NOT NULL, action TEXT NOT NULL, summary TEXT NOT NULL, data TEXT)`);
       d.run('CREATE INDEX IF NOT EXISTS idx_audit_at ON audit_log (at)');
+    },
+
+    // 5: thùng rác cho loại thẻ — archived_at là lúc xoá, cũng là used_at của các lá bị thu lại lúc đó
+    // (để khôi phục loại thẻ thì trả đúng những lá ấy). Loại đã ẩn từ trước: lấy lần thu lá gần nhất.
+    d => {
+      if (!query('PRAGMA table_info(cards)').some(c => c.name === 'archived_at')) {
+        d.run('ALTER TABLE cards ADD COLUMN archived_at INTEGER');
+      }
+      d.run(`UPDATE cards SET archived_at = COALESCE(
+          (SELECT MAX(used_at) FROM student_cards v WHERE v.card_id = cards.id AND v.status = 'removed'), 0)
+        WHERE archived = 1 AND archived_at IS NULL`);
+    },
+
+    // 6: thùng rác cho học sinh (archived_at: lúc xoá). Khác "Ẩn" (active = 0): học sinh trong thùng rác biến khỏi
+    // mọi màn hình kể cả danh sách lớp và thống kê, nhưng dữ liệu còn nguyên để khôi phục.
+    d => {
+      if (!query('PRAGMA table_info(students)').some(c => c.name === 'archived_at')) {
+        d.run('ALTER TABLE students ADD COLUMN archived_at INTEGER');
+      }
     }
   ];
 

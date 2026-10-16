@@ -81,7 +81,7 @@
     fileEl.title = s.status === 'error' ? s.error : 'Trình duyệt cần bạn cho phép ghi lại vào file ' + (s.name || '');
   });
   fileEl.onclick = async () => {
-    if (T.fileSink.state().status === 'error') { location.hash = '#/cai-dat'; return; }
+    if (T.fileSink.state().status === 'error') { T.settingsView.open('data', 'backup'); return; }
     if (await T.fileSink.resume()) T.ui.toast('Đã tiếp tục tự lưu ra file');
   };
   T.fileSink.init().catch(err => console.error(err));
