@@ -61,7 +61,7 @@ test('mở lại cùng lớp/năm/tháng/tuần/tiết trả về đúng tiết 
   assert.equal(T.db.scalar('SELECT COUNT(*) FROM lessons'), 1);
 });
 
-test('xoá học sinh xoá kèm ATP, thẻ và tư cách thành viên nhóm', async () => {
+test('xoá vĩnh viễn học sinh xoá kèm ATP, thẻ và tư cách thành viên nhóm', async () => {
   const { T } = await boot();
   const { ids, lesson } = seedClass(T);
   T.atp.award(ids, lesson.id, 'speak');
@@ -71,6 +71,8 @@ test('xoá học sinh xoá kèm ATP, thẻ và tư cách thành viên nhóm', as
   T.evolutions.grant(ids[0], T.cards.list()[0], { year: 2026, month: 10, week: 2 });
 
   T.students.remove(ids[0]);
+  T.students.purge(ids[0]);
+  assert.equal(T.db.scalar('SELECT COUNT(*) FROM students WHERE id = ?', [ids[0]]), 0);
   assert.equal(T.db.scalar('SELECT COUNT(*) FROM atp_events WHERE student_id = ?', [ids[0]]), 0);
   assert.equal(T.db.scalar('SELECT COUNT(*) FROM student_cards WHERE student_id = ?', [ids[0]]), 0);
   assert.equal(T.db.scalar('SELECT COUNT(*) FROM group_members WHERE student_id = ?', [ids[0]]), 0);

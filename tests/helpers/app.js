@@ -13,9 +13,12 @@ const FILES = [
   'js/core/ui.js',
   'js/core/time.js',
   'js/core/db.js',
+  'js/core/tab-lock.js',
+  'js/core/file-sink.js',
   'js/core/store.js',
   'js/core/router.js',
   'js/data/settings.js',
+  'js/data/audit.js',
   'js/data/schoolyear.js',
   'js/data/classes.js',
   'js/data/students.js',
@@ -25,8 +28,10 @@ const FILES = [
   'js/data/evolutions.js',
   'js/data/groups.js',
   'js/data/stats.js',
+  'js/data/integrity.js',
   'js/features/award.js',
-  'js/features/excel-import.js'
+  'js/features/excel-import.js',
+  'js/features/backup.js'
 ];
 
 const DAY = 86400000;
@@ -80,9 +85,30 @@ function freeze(t, iso) {
   t.mock.timers.enable({ apis: ['Date'], now: Date.parse(iso) });
 }
 
-// Đặt lại thời điểm ghi của mọi lượt cộng ATP (chuỗi UTC 'YYYY-MM-DD HH:MM:SS')
+// Đặt lại thời điểm ghi của mọi lượt cộng ATP (chuỗi UTC 'YYYY-MM-DD HH:MM:SS'); ghi cả created_ms
 function stampEvents(T, sqlUtc, where) {
-  T.db.run(`UPDATE atp_events SET created_at = ? ${where ? 'WHERE ' + where : ''}`, [sqlUtc]);
+  T.db.run(`UPDATE atp_events SET created_at = ?, created_ms = CAST(strftime('%s', ?) AS INTEGER) * 1000
+    ${where ? 'WHERE ' + where : ''}`, [sqlUtc, sqlUtc]);
 }
 
-module.exports = { boot, seedClass, freeze, stampEvents, dateOf, DAY };
+// Kho lưu giả thay IndexedDB; fails = số lần ghi dữ liệu chính tiếp theo sẽ lỗi.
+// s.data là dữ liệu chính ('db.sqlite'); s.map chứa mọi key (kể cả bản chụp).
+function fakeStorage(fails = 0) {
+  const s = {
+    map: new Map(), fails, writes: 0,
+    get data() { return s.map.get('db.sqlite') || null; },
+    set data(v) { s.map.set('db.sqlite', v); },
+    get: async key => s.map.get(key) || null,
+    set: async (key, value) => {
+      if (key !== 'db.sqlite') { s.map.set(key, value); return; }
+      s.writes++;
+      if (s.fails > 0) { s.fails--; throw new Error('QuotaExceededError'); }
+      s.data = value;
+    },
+    del: async key => { s.map.delete(key); },
+    keys: async () => [...s.map.keys()]
+  };
+  return s;
+}
+
+module.exports = { boot, seedClass, freeze, stampEvents, dateOf, fakeStorage, DAY };

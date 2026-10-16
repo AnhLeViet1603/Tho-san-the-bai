@@ -191,3 +191,12 @@ input[type=date] { color-scheme: dark; }
 .pcard-foot { font-size: .85rem; }
 .table.pick tbody tr { cursor: pointer; }
 .toast.gold { border-color: var(--atp); background: #3a2e10; }
+
+/* Tab con bên trong một tab Cài đặt */
+.subtabs { display: flex; flex-wrap: wrap; gap: 4px; margin: -4px 0 16px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+.subtabs button {
+  padding: 6px 12px; border-radius: 9px; border: 1px solid transparent; cursor: pointer; font-size: .9rem;
+  background: transparent; color: var(--muted);
+}
+.subtabs button:hover { color: var(--text); background: rgba(255, 255, 255, .04); }
+.subtabs button.on { color: var(--text); border-color: var(--line); background: rgba(95, 224, 138, .12); font-weight: 600; }

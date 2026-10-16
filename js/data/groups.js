@@ -9,7 +9,8 @@
     const byId = {};
     groups.forEach(g => { g.members = []; byId[g.id] = g; });
     T.db.query(
-      'SELECT gm.* FROM group_members gm JOIN groups g ON g.id = gm.group_id WHERE g.lesson_id = ?', [lessonId])
+      `SELECT gm.* FROM group_members gm JOIN groups g ON g.id = gm.group_id
+       JOIN students s ON s.id = gm.student_id AND s.archived_at IS NULL WHERE g.lesson_id = ?`, [lessonId])
       .forEach(m => byId[m.group_id].members.push(m.student_id));
     return groups;
   }
@@ -79,7 +80,7 @@
           [lesson.class_id, lesson.id, g.name, g.color]);
         g.members.forEach(sid => T.db.run(
           `INSERT INTO group_members (group_id, student_id)
-           SELECT ?, id FROM students WHERE id = ? AND active = 1`, [id, sid]));
+           SELECT ?, id FROM students WHERE id = ? AND active = 1 AND archived_at IS NULL`, [id, sid]));
       });
     });
     return true;

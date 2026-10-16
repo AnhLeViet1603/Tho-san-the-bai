@@ -26,6 +26,8 @@
       </a>
       <nav id="nav" class="nav"></nav>
       <div id="sideClass" class="side-foot"></div>
+      <div id="saveState" class="save-state" role="status" aria-live="polite"></div>
+      <button type="button" id="fileState" class="file-state" hidden></button>
       <footer class="side-ver">Thợ Săn Thẻ Bài <span data-version></span></footer>
     </aside>
     <main class="main" id="main">
@@ -44,11 +46,14 @@
   <script src="js/core/ui.js"></script>
   <script src="js/core/time.js"></script>
   <script src="js/core/db.js"></script>
+  <script src="js/core/tab-lock.js"></script>
+  <script src="js/core/file-sink.js"></script>
   <script src="js/core/store.js"></script>
   <script src="js/core/router.js"></script>
 
   <!-- Dữ liệu -->
   <script src="js/data/settings.js"></script>
+  <script src="js/data/audit.js"></script>
   <script src="js/data/schoolyear.js"></script>
   <script src="js/data/classes.js"></script>
   <script src="js/data/students.js"></script>
@@ -58,6 +63,7 @@
   <script src="js/data/evolutions.js"></script>
   <script src="js/data/groups.js"></script>
   <script src="js/data/stats.js"></script>
+  <script src="js/data/integrity.js"></script>
 
   <!-- Tính năng dùng chung -->
   <script src="js/features/picker.js"></script>

@@ -13,13 +13,17 @@
 
   // Ghi một lượt cộng cho nhiều học sinh; amount được chụp lại tại thời điểm ghi
   function award(studentIds, lessonId, type, opts = {}) {
+    if (!TYPES[type]) throw new Error('Loại cộng ATP không hợp lệ: ' + type);
     const lesson = T.lessons.get(lessonId);
+    if (!lesson) throw new Error('Không tìm thấy tiết học');
     const amount = opts.amount != null ? opts.amount : amountFor(type);
-    const batch = Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+    if (!Number.isInteger(amount)) throw new Error('Số ATP phải là số nguyên');
+    const now = Date.now();
+    const batch = now + '-' + Math.random().toString(36).slice(2, 8);
     T.db.tx(() => studentIds.forEach(sid => T.db.run(
-      `INSERT INTO atp_events (student_id, class_id, lesson_id, type, amount, group_id, batch_id, note)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [sid, lesson.class_id, lessonId, type, amount, opts.groupId || null, batch, opts.note || null])));
+      `INSERT INTO atp_events (student_id, class_id, lesson_id, type, amount, group_id, batch_id, note, created_ms)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [sid, lesson.class_id, lessonId, type, amount, opts.groupId || null, batch, opts.note || null, now])));
     return amount;
   }
 
@@ -34,27 +38,56 @@
     const r = T.schoolYear.range();
     return toMap(T.db.query(`
       SELECT student_id, SUM(amount) AS total FROM atp_events
-      WHERE class_id = ? AND created_at >= ? AND created_at < ? GROUP BY student_id`,
-      [classId, r.startSql, r.endSql]));
+      WHERE class_id = ? AND created_ms >= ? AND created_ms < ? GROUP BY student_id`,
+      [classId, r.startMs, r.endMs]));
   }
 
   function totalFor(studentId) {
     const r = T.schoolYear.range();
     return T.db.scalar(`
       SELECT COALESCE(SUM(amount), 0) FROM atp_events
-      WHERE student_id = ? AND created_at >= ? AND created_at < ?`, [studentId, r.startSql, r.endSql]);
+      WHERE student_id = ? AND created_ms >= ? AND created_ms < ?`, [studentId, r.startMs, r.endMs]);
   }
 
   const totalsByLesson = lessonId => toMap(T.db.query(
     'SELECT student_id, SUM(amount) AS total FROM atp_events WHERE lesson_id = ? GROUP BY student_id', [lessonId]));
 
+  // Xoá các sự kiện và ghi nhật ký kèm nội dung đã xoá (đủ để nhập lại tay nếu cần)
+  function removeLogged(ids, action, what) {
+    if (!ids.length) return 0;
+    const rows = T.db.query(`SELECT e.*, s.name AS student_name FROM atp_events e
+      LEFT JOIN students s ON s.id = e.student_id WHERE e.id IN (${ids.map(() => '?').join(',')}) ORDER BY e.id`, ids);
+    if (!rows.length) return 0;
+    const sum = rows.reduce((a, r) => a + r.amount, 0);
+    const who = rows.length === 1 ? rows[0].student_name : `${rows.length} học sinh`;
+    const type = TYPES[rows[0].type] ? TYPES[rows[0].type].label : rows[0].type;
+    T.db.tx(() => {
+      T.audit.log(action, `${what}: ${type} ${rows[0].amount > 0 ? '+' : ''}${rows[0].amount} ATP · ${who}` +
+        (rows.length > 1 ? ` (tổng ${sum})` : ''), { events: rows });
+      T.db.run(`DELETE FROM atp_events WHERE id IN (${rows.map(() => '?').join(',')})`, rows.map(r => r.id));
+    });
+    return rows.length;
+  }
+
   // Xoá lượt cộng gần nhất của tiết; trả về số sự kiện đã xoá
-  function undoLast(lessonId) {
-    const last = T.db.get('SELECT id, batch_id FROM atp_events WHERE lesson_id = ? ORDER BY id DESC LIMIT 1', [lessonId]);
-    if (!last) return 0;
-    const n = T.db.scalar('SELECT COUNT(*) FROM atp_events WHERE lesson_id = ? AND batch_id = ?', [lessonId, last.batch_id]);
-    T.db.run('DELETE FROM atp_events WHERE lesson_id = ? AND batch_id = ?', [lessonId, last.batch_id]);
-    return n;
+  const undoLast = lessonId => removeLogged(lastBatchIds(lessonId), 'atp.undo', 'Hoàn tác lượt cộng');
+
+  // Id các sự kiện của lượt cộng gần nhất trong tiết (lượt mà undoLast sẽ xoá)
+  function lastBatchIds(lessonId) {
+    const last = T.db.get('SELECT batch_id FROM atp_events WHERE lesson_id = ? ORDER BY id DESC LIMIT 1', [lessonId]);
+    if (!last) return [];
+    return T.db.query('SELECT id FROM atp_events WHERE lesson_id = ? AND batch_id = ?', [lessonId, last.batch_id]).map(r => r.id);
+  }
+
+  // Xoá các sự kiện này thì những em nào thành ra đã lật nhiều thẻ hơn số lượt được hưởng? [{ id, name }]
+  function removalImpact(eventIds) {
+    if (!eventIds.length) return [];
+    const r = T.schoolYear.range();
+    const deltas = {};
+    T.db.query(`SELECT student_id, SUM(amount) AS s FROM atp_events
+      WHERE id IN (${eventIds.map(() => '?').join(',')}) AND created_ms >= ? AND created_ms < ? GROUP BY student_id`,
+    [...eventIds, r.startMs, r.endMs]).forEach(row => { deltas[row.student_id] = -row.s; });
+    return T.evolutions.overdrawnIf(deltas);
   }
 
   const history = lessonId => T.db.query(`
@@ -64,7 +97,9 @@
     LEFT JOIN groups g ON g.id = e.group_id
     WHERE e.lesson_id = ? ORDER BY e.id DESC`, [lessonId]);
 
-  const removeEvent = id => T.db.run('DELETE FROM atp_events WHERE id = ?', [id]);
+  const removeEvent = id => removeLogged([id], 'atp.remove', 'Xoá lượt cộng trong Lịch sử');
 
-  T.atp = { TYPES, amountFor, award, totalsByClass, totalFor, totalsByLesson, undoLast, history, removeEvent };
+  T.atp = {
+    TYPES, amountFor, award, totalsByClass, totalFor, totalsByLesson, undoLast, lastBatchIds, removalImpact, history, removeEvent
+  };
 })(window.TSTB);

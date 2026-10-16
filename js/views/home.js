@@ -11,6 +11,7 @@
         <div><h1>🌳 Khu rừng tiến hoá</h1><p>Năm học ${school.label} (${T.time.fmtDate(school.start)} – ${T.time.fmtDate(school.end)}) · chọn một lớp để bắt đầu săn ATP.</p></div>
         <a class="btn" href="#/cai-dat">＋ Quản lý lớp</a>
       </header>
+      ${T.backup.reminderHtml()}
       ${classes.length ? `<div class="class-grid">${classes.map(c => `
         <button type="button" class="class-card" data-class="${c.id}" style="--accent:${esc(c.color || '#5fe08a')}">
           <span class="class-ico">${esc(c.icon || '🌿')}</span>
@@ -25,6 +26,7 @@
         '<a class="btn" href="#/cai-dat">Tới Cài đặt</a>')}`;
 
     el.onclick = e => {
+      if (T.backup.onReminderClick(e)) return;
       const card = e.target.closest('[data-class]');
       if (!card) return;
       T.store.set({ classId: Number(card.dataset.class) });

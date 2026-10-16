@@ -37,9 +37,11 @@ export async function launch(name) {
   let seq = 0;
   const pending = new Map();
   const pageErrors = [];
+  const handlers = [];
   ws.onmessage = m => {
     const d = JSON.parse(m.data);
     if (d.id && pending.has(d.id)) { pending.get(d.id)(d); pending.delete(d.id); }
+    if (d.method) handlers.filter(h => h.method === d.method).forEach(h => h.fn(d.params));
     if (d.method === 'Runtime.exceptionThrown') {
       pageErrors.push(d.params.exceptionDetails.exception?.description || d.params.exceptionDetails.text);
     }
@@ -84,5 +86,11 @@ export async function launch(name) {
     process.exit(failed.length ? 1 : 0);
   }
 
-  return { send, ev, waitFor, shot, viewport, check, finish, pageErrors, shots };
+  // Chờ sự kiện DevTools Protocol kế tiếp có tên `method` (ví dụ 'Page.fileChooserOpened')
+  const once = method => new Promise(resolve => {
+    const h = { method, fn: params => { handlers.splice(handlers.indexOf(h), 1); resolve(params); } };
+    handlers.push(h);
+  });
+
+  return { send, ev, waitFor, shot, viewport, check, finish, once, pageErrors, shots, port };
 }

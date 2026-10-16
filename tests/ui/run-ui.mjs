@@ -108,6 +108,17 @@ await waitFor("document.getElementById('app') && !document.getElementById('app')
 // ============================================================
 await group('1. Khởi động', async () => {
   check('ứng dụng mở được qua file://', await ev("!document.getElementById('app').hidden"));
+  check('lần đầu mở: hộp chào mời nhập file sao lưu', await waitFor("!!document.querySelector('.welcome-modal')", 3000) &&
+    /Nhập file sao lưu/.test(await text('.welcome-modal footer')) && /Bắt đầu mới/.test(await text('.welcome-modal footer')));
+  await shot('01-hop-chao');
+  await ev("[...document.querySelectorAll('.welcome-modal footer .btn')].find(b => /Bắt đầu mới/.test(b.innerText)).click()");
+  await sleep(200);
+  check('"Bắt đầu mới" đóng hộp chào', await count('.modal-wrap') === 0);
+  await ev('TSTB.db.flush()');
+  await send('Page.reload');
+  await waitFor("document.getElementById('app') && !document.getElementById('app').hidden", 20000);
+  await sleep(300);
+  check('mở lại: không hiện hộp chào nữa', await count('.welcome-modal') === 0);
   check('footer ghi số phiên bản', /^Thợ Săn Thẻ Bài v\d+\.\d+\.\d+$/.test((await text('.side-ver')).trim()), await text('.side-ver'));
   check('trạng thái trống ở Khu rừng', /Khu rừng còn trống/.test(await text('.view')));
   check('thanh điều hướng có 5 mục, không còn tab Chia nhóm', await count('#nav a') === 5 && !/Chia nhóm/.test(await text('#nav')));
@@ -142,7 +153,30 @@ await group('2. Cài đặt: lớp học', async () => {
   check('xoá lớp phải xác nhận', await count('.confirm-msg') === 1);
   await modalOk();
   await sleep(200);
-  check('lớp bị xoá sau khi xác nhận', await count('#setBody tbody tr') === 1);
+  check('xoá lớp: chuyển vào thùng rác, bảng lớp còn 1 dòng', await count('#setBody tbody tr') === 1);
+  check('tab con hiện số lớp đang dùng / trong thùng rác', /Đang dùng \(1\)/.test(await text('.subtabs')) && /Thùng rác \(1\)/.test(await text('.subtabs')), await text('.subtabs'));
+  await click('[data-sub="classes:trash"]');
+  await sleep(200);
+  check('tab Thùng rác: có lớp vừa xoá, không còn bảng lớp đang dùng', /11B2/.test(await text('.trash-table')) && !/Thêm lớp/.test(await text('#setBody')));
+  await click('.trash-table [data-act="restore-class"]');
+  await sleep(200);
+  check('khôi phục từ thùng rác: thùng rác trống, lớp trở lại', await count('.trash-table') === 0 && /Thùng rác trống/.test(await text('#setBody')) && await ev('TSTB.classes.list().length') === 2);
+  await click('[data-sub="classes:active"]');
+  await sleep(200);
+  await ev(`[...document.querySelectorAll('#setBody tbody tr')].find(tr => /11B2/.test(tr.innerText)).querySelector('[data-act="del"]').click()`);
+  await sleep(150);
+  await modalOk();
+  await sleep(200);
+  await click('[data-sub="classes:trash"]');
+  await sleep(200);
+  await click('.trash-table [data-act="purge-class"]');
+  await sleep(150);
+  check('xoá vĩnh viễn phải xác nhận', /VĨNH VIỄN/.test(await text('.confirm-msg')));
+  await modalOk();
+  await sleep(200);
+  check('xoá vĩnh viễn: lớp mất hẳn', await count('.trash-table') === 0 && await ev("TSTB.db.scalar(\"SELECT COUNT(*) FROM classes WHERE name = '11B2'\")") === 0);
+  await click('[data-sub="classes:active"]');
+  await sleep(200);
 });
 
 await group('3. Cài đặt: học sinh + Import Excel', async () => {
@@ -485,8 +519,27 @@ await group('11. Lưu bền + giao diện hẹp', async () => {
 });
 
 await group('12. Xoá toàn bộ dữ liệu', async () => {
+  // Sau mọi thao tác thật ở các nhóm trên (thêm / xoá lớp, học sinh, nhóm, thẻ, hoàn tác…)
+  check('các luồng thật của ứng dụng không để lại dữ liệu lỗi', await ev('TSTB.integrity.check().ok'),
+    await ev('JSON.stringify(TSTB.integrity.check())'));
   await go('cai-dat');
   await click('[data-tab="data"]');
+  await sleep(200);
+  check('dữ liệu sạch thì không hiện khung báo lỗi', await count('.integrity-box') === 0);
+  check('tab Dữ liệu chia 4 tab con', await count('#setBody .subtabs button') === 4, await text('.subtabs'));
+  check('mặc định mở tab con Sao lưu', /Xuất file \.sqlite/.test(await text('#setBody')) && await count('#snapList') === 0 && await count('.audit-table') === 0);
+  await shot('12-sao-luu');
+  await click('[data-sub="data:audit"]');
+  await sleep(200);
+  const audit = await text('.audit-table');
+  check('Nhật ký thao tác ghi lại các thao tác ở trên', /Chuyển lớp 11B2 vào thùng rác/.test(audit) &&
+    /Xoá vĩnh viễn lớp 11B2/.test(audit) && /Hoàn tác lượt cộng/.test(audit), audit.slice(0, 400));
+  await shot('12-nhat-ky');
+  await go('cai-dat');
+  await click('[data-tab="data"]');
+  await sleep(200);
+  check('quay lại Dữ liệu: vẫn nhớ tab con đang mở', await count('.audit-table') === 1);
+  await click('[data-sub="data:danger"]');
   await sleep(200);
   await click('[data-act="reset"]');
   await sleep(150);
@@ -496,6 +549,33 @@ await group('12. Xoá toàn bộ dữ liệu', async () => {
   await modalOk();
   await sleep(500);
   check('sau 2 lần xác nhận: dữ liệu sạch, thẻ mẫu trở lại', await ev('TSTB.classes.list().length') === 0 && await ev('TSTB.cards.list().length') === 5);
+
+  await click('[data-sub="data:snaps"]');
+  await sleep(200);
+  await waitFor("/Trước khi xoá toàn bộ/.test(document.getElementById('snapList').innerText)");
+  const snapText = await text('#snapList');
+  check('có bản chụp "Trước khi xoá toàn bộ" và bản hằng ngày', /Trước khi xoá toàn bộ/.test(snapText) && /Tự động hằng ngày/.test(snapText), snapText);
+  check('hiện dung lượng bộ nhớ đang dùng', /Đang dùng .* MB/.test(await text('#usageNote')), await text('#usageNote'));
+  await shot('12-ban-chup');
+  await ev(`[...document.querySelectorAll('#snapList tr')].find(tr => /Trước khi xoá toàn bộ/.test(tr.innerText)).querySelector('[data-act="restore"]').click()`);
+  await sleep(150);
+  check('khôi phục phải xác nhận', /Khôi phục bản chụp/.test(await text('.confirm-msg')));
+  await modalOk();
+  await waitFor('TSTB.classes.list().length === 1');
+  check('khôi phục bản chụp: lớp và thẻ trở lại', await ev('TSTB.classes.list().length') === 1 && await ev('TSTB.cards.list().length') === 6);
+  await waitFor("/Trước khi khôi phục/.test(document.getElementById('snapList').innerText)");
+  check('khôi phục cũng tạo bản chụp "Trước khi khôi phục"', /Trước khi khôi phục/.test(await text('#snapList')));
+
+  await send('Emulation.setDeviceMetricsOverride', { width: 600, height: 900, deviceScaleFactor: 1, mobile: false });
+  await sleep(300);
+  for (const s of ['backup', 'snaps', 'audit', 'danger']) {
+    await click(`[data-sub="data:${s}"]`);
+    await sleep(250);
+    const over = await ev('document.documentElement.scrollWidth - innerWidth');
+    check(`Dữ liệu › ${s} không tràn ngang ở màn hình 600px`, over <= 0, over);
+  }
+  await shot('12-tab-con-man-hep');
+  await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
 });
 
 section = 'Chung';

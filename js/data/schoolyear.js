@@ -51,8 +51,6 @@
     const ye = end.slice(0, 4);
     return {
       start, end, startMs, endMs,
-      startSql: T.time.toSql(startMs),
-      endSql: T.time.toSql(endMs),
       label: ys === ye ? ys : `${ys}–${ye}`
     };
   }

@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Thử quyền ghi file</title>
+  <style>
+    :root { --bg: #0d2317; --panel: #10281b; --text: #e6f5e9; --muted: #8fb39a; --line: rgba(140, 220, 160, .25); --ok: #5fe08a; --bad: #ff6b6b; }
+    body { margin: 0; padding: 24px 16px; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, sans-serif; }
+    main { max-width: 720px; margin: 0 auto; display: grid; gap: 16px; }
+    section { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+    h1 { margin: 0; font-size: 22px; } h2 { margin: 0 0 8px; font-size: 17px; }
+    p, li { color: var(--muted); } ol { padding-left: 20px; margin: 0; }
+    button { font: inherit; padding: 8px 14px; border-radius: 10px; border: 1px solid var(--line); background: #1c4a2e; color: var(--text); cursor: pointer; }
+    pre { white-space: pre-wrap; word-break: break-word; background: #07140d; padding: 12px; border-radius: 8px; margin: 8px 0 0; font-size: 13px; }
+    .row { display: flex; flex-wrap: wrap; gap: 8px; }
+    .ok { color: var(--ok); } .bad { color: var(--bad); }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Thử quyền ghi file (File System Access API)</h1>
+  <section>
+    <h2>Cách thử</h2>
+    <ol>
+      <li>Bấm <b>1. Chọn file thử</b>, lưu file <code>thu-quyen.txt</code> vào đâu cũng được.</li>
+      <li>Bấm <b>2. Ghi lại</b> vài lần: nội dung file đổi theo giờ hiện tại.</li>
+      <li><b>Tắt hẳn trình duyệt</b> (mọi cửa sổ), mở lại trang này. Bấm <b>2. Ghi lại</b>: nếu trình duyệt hỏi quyền, ghi lại các lựa chọn nó đưa ra, rồi chọn <b>“Cho phép mọi lần truy cập”</b> (Allow on every visit) nếu có.</li>
+      <li>Tắt trình duyệt lần nữa, mở lại, bấm <b>2. Ghi lại</b>: lần này có hỏi không?</li>
+      <li>Bấm <b>Sao chép kết quả</b> và gửi lại.</li>
+    </ol>
+  </section>
+  <section>
+    <h2>Thao tác</h2>
+    <div class="row">
+      <button id="pick">1. Chọn file thử</button>
+      <button id="write">2. Ghi lại</button>
+      <button id="check">Kiểm tra quyền (không hỏi)</button>
+      <button id="copy">Sao chép kết quả</button>
+      <button id="forget">Quên file đã chọn</button>
+    </div>
+    <pre id="out"></pre>
+  </section>
+</main>
+<script>
+  'use strict';
+  const out = document.getElementById('out');
+  const lines = [];
+  const log = (msg, cls) => {
+    const t = new Date().toLocaleTimeString('vi-VN', { hour12: false });
+    lines.push(`[${t}] ${msg}`);
+    const el = document.createElement('div');
+    el.textContent = `[${t}] ${msg}`;
+    if (cls) el.className = cls;
+    out.append(el);
+  };
+
+  // Nhớ handle trong IndexedDB như ứng dụng thật sẽ làm
+  const idb = mode => new Promise((resolve, reject) => {
+    const req = indexedDB.open('fs-probe', 1);
+    req.onupgradeneeded = () => req.result.createObjectStore('h');
+    req.onsuccess = () => resolve(req.result.transaction('h', mode).objectStore('h'));
+    req.onerror = () => reject(req.error);
+  });
+  const done = r => new Promise((resolve, reject) => { r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error); });
+  const loadHandle = async () => done((await idb('readonly')).get('file'));
+  const saveHandle = async h => done((await idb('readwrite')).put(h, 'file'));
+  const clearHandle = async () => done((await idb('readwrite')).delete('file'));
+
+  async function env() {
+    const brands = navigator.userAgentData ? navigator.userAgentData.brands.map(b => `${b.brand} ${b.version}`).join(', ') : navigator.userAgent;
+    log(`Trình duyệt: ${brands}`);
+    log(`Địa chỉ: ${location.protocol}//${location.host}${location.pathname} · origin=${location.origin} · isSecureContext=${isSecureContext}`);
+    log(`showSaveFilePicker: ${typeof window.showSaveFilePicker}`, typeof window.showSaveFilePicker === 'function' ? 'ok' : 'bad');
+    const h = await loadHandle().catch(e => { log('Đọc handle lỗi: ' + e.message, 'bad'); return null; });
+    log(h ? `Đã nhớ file: ${h.name}` : 'Chưa nhớ file nào');
+    if (h) await check(h);
+  }
+
+  async function check(h) {
+    try {
+      const p = await h.queryPermission({ mode: 'readwrite' });
+      log(`queryPermission (không hỏi): ${p}`, p === 'granted' ? 'ok' : '');
+      return p;
+    } catch (e) { log('queryPermission lỗi: ' + e.name + ' ' + e.message, 'bad'); return null; }
+  }
+
+  async function writeTo(h) {
+    const w = await h.createWritable();
+    await w.write(`Ghi lúc ${new Date().toLocaleString('vi-VN', { hour12: false })}\n`);
+    await w.close();
+    log(`Đã ghi vào ${h.name}`, 'ok');
+  }
+
+  document.getElementById('pick').onclick = async () => {
+    try {
+      const h = await showSaveFilePicker({ suggestedName: 'thu-quyen.txt', types: [{ description: 'Văn bản', accept: { 'text/plain': ['.txt'] } }] });
+      await saveHandle(h);
+      log(`Đã chọn và nhớ file: ${h.name}`, 'ok');
+      await check(h);
+      await writeTo(h);
+    } catch (e) { log('Chọn file: ' + e.name + ' ' + e.message, 'bad'); }
+  };
+
+  document.getElementById('write').onclick = async () => {
+    const h = await loadHandle();
+    if (!h) return log('Chưa chọn file. Bấm "1. Chọn file thử" trước.', 'bad');
+    try {
+      let p = await check(h);
+      if (p !== 'granted') {
+        log('Xin quyền (trình duyệt sẽ hỏi)…');
+        p = await h.requestPermission({ mode: 'readwrite' });
+        log(`requestPermission: ${p}`, p === 'granted' ? 'ok' : 'bad');
+      }
+      if (p === 'granted') await writeTo(h);
+    } catch (e) { log('Ghi lỗi: ' + e.name + ' ' + e.message, 'bad'); }
+  };
+
+  document.getElementById('check').onclick = async () => {
+    const h = await loadHandle();
+    if (h) await check(h); else log('Chưa chọn file.');
+  };
+  document.getElementById('forget').onclick = async () => { await clearHandle(); log('Đã quên file.'); };
+  document.getElementById('copy').onclick = async () => {
+    try { await navigator.clipboard.writeText(lines.join('\n')); log('Đã sao chép.', 'ok'); }
+    catch (e) { log('Không sao chép được, hãy bôi đen khung kết quả rồi Ctrl+C.', 'bad'); }
+  };
+
+  env();
+</script>
+</body>
+</html>

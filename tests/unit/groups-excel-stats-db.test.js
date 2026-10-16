@@ -225,6 +225,7 @@ test('nâng cấp dữ liệu bản cũ: bảng evolutions được chuyển san
   const [a, b] = T.cards.list();
   T.db.run('CREATE TABLE evolutions (student_id INTEGER PRIMARY KEY, card_id INTEGER NOT NULL, used INTEGER DEFAULT 0)');
   T.db.run('INSERT INTO evolutions VALUES (?, ?, 0), (?, ?, 1)', [ids[0], a.id, ids[1], b.id]);
+  T.db.run('PRAGMA user_version = 0'); // bản cũ chưa ghi phiên bản cấu trúc
 
   await T.db.importBytes(T.db.exportBytes());
   assert.equal(T.db.scalar("SELECT COUNT(*) FROM sqlite_master WHERE name = 'evolutions'"), 0);
