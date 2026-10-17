@@ -18,7 +18,7 @@ const fill = async (sel, value) => {
     e.dispatchEvent(new Event('change', { bubbles: true })); })()`);
   await sleep(300);
 };
-const cardsNote = () => text('#statsBody h3 small');
+const cardsNote = () => text('.chart:has(#cCards) h3 small');
 
 await send('Page.navigate', { url: APP });
 check('ứng dụng mở được', await waitFor("!document.getElementById('app').hidden"));
@@ -104,6 +104,44 @@ await click('[data-sub="cards"]');
 const pie2 = await ev("Chart.getChart(document.querySelector('#cRarity canvas')).data.datasets[0].data");
 check('đổi Phượng SR → R sau khi phát: số liệu cũ không đổi', pie2.join() === '3,2,1', pie2);
 await shot('do-hiem');
+
+console.log('▸ Nhãn tooltip');
+const labels = await ev("['cCards', 'cRarity'].map(id => Chart.getChart(document.querySelector('#' + id + ' canvas')).data.datasets[0].label)");
+check('biểu đồ thẻ ghi "Số lá" thay vì ATP', labels.every(l => l === 'Số lá'), labels);
+
+console.log('▸ Bố cục lưới');
+// Mỗi hàng của lưới biểu đồ phải lấp đủ bề ngang (không có ô trống)
+const rowsFull = () => ev(`(() => {
+  const grid = document.querySelector('.charts'), w = grid.getBoundingClientRect().width;
+  const rows = {};
+  grid.querySelectorAll(':scope > .chart').forEach(c => { const r = c.getBoundingClientRect(); (rows[Math.round(r.top)] = rows[Math.round(r.top)] || []).push(r); });
+  return Object.values(rows).map(rs => Math.round(rs.at(-1).right - rs[0].left - w)).every(d => Math.abs(d) <= 2);
+})()`);
+for (const tab of ['atp', 'cards']) {
+  await click(`[data-sub="${tab}"]`);
+  check(`màn rộng, tab ${tab}: mọi hàng biểu đồ lấp đủ, không có ô trống`, await rowsFull());
+}
+const gap = await ev(`document.querySelector('.charts').getBoundingClientRect().top - document.querySelector('.kpis').getBoundingClientRect().bottom`);
+check('tab Thẻ: hàng KPI cách lưới biểu đồ', gap >= 10, gap);
+
+console.log('▸ Thu hẹp cửa sổ khi đang xem');
+await click('#resetFilter'); // bỏ lọc lớp 11B2 (lớp này chưa có ATP) để tab ATP có biểu đồ
+for (const tab of ['atp', 'cards']) {
+  await b.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+  await click(`[data-sub="${tab}"]`);
+  await sleep(400);
+  await b.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+  await sleep(800);
+  const m = await ev(`[...document.querySelectorAll('.chart-box')].filter(x => x.querySelector('canvas')).map(box => {
+    const a = box.getBoundingClientRect(), c = box.querySelector('canvas').getBoundingClientRect();
+    return { right: Math.round(a.right), off: Math.round(c.left + c.width / 2 - (a.left + a.width / 2)) };
+  })`);
+  check(`tab ${tab}: khung biểu đồ co theo màn 390px, biểu đồ nằm giữa`, m.length && m.every(x => x.right <= 390 && Math.abs(x.off) <= 2), m);
+  check(`tab ${tab}: không cuộn ngang`, await ev('document.documentElement.scrollWidth <= innerWidth'));
+}
+await ev("document.querySelector('.chart').scrollIntoView({ block: 'start' })");
+await shot('mobile-the');
+await b.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
 
 check('không có lỗi JS', !b.pageErrors.length, b.pageErrors);
 b.finish();

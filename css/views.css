@@ -54,6 +54,9 @@
   background: rgba(255, 255, 255, .07); border: 1px solid var(--line);
 }
 .chip:hover { border-color: var(--leaf); }
+/* Thẻ học sinh đang giữ (bảng Thẻ của học sinh): xuống dòng theo từng badge, không chồng lên nhau ở màn hẹp */
+.held-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.held-chips .chip { cursor: inherit; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .chip.ready {
   color: #2a1c00; font-weight: 600; border-color: var(--atp);
   background: linear-gradient(135deg, #ffe08a, var(--atp)); animation: pulse 1.3s ease-in-out infinite;
@@ -76,16 +79,22 @@
 .kpi small { color: var(--muted); }
 .kpi b { font-size: 1.5rem; }
 
+.stats-body { display: grid; gap: 14px; }
 .charts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+/* Canvas Chart.js có chiều rộng px cố định: ô lưới (min-width 0) và cột bên trong .panel (vốn là grid, cột auto)
+   phải được phép hẹp hơn canvas, nếu không khung giữ nguyên bề rộng cũ khi thu hẹp cửa sổ và biểu đồ lệch phải */
+.chart { min-width: 0; grid-template-columns: minmax(0, 1fr); }
 .chart.wide { grid-column: span 2; }
+.chart.full { grid-column: 1 / -1; }
+.chart-note { font-size: .82rem; margin: -4px 0 6px; }
 .chart h3 { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .chart h3 select { margin-left: auto; font-size: .85rem; font-weight: 400; padding: 4px 8px; }
 .chart-box { position: relative; height: 270px; }
 .chart-empty { height: 100%; display: grid; place-content: center; }
 
 @media (max-width: 1100px) {
-  .charts { grid-template-columns: 1fr; }
-  .chart.wide { grid-column: auto; }
+  .charts { grid-template-columns: minmax(0, 1fr); }
+  .chart.wide, .chart.full { grid-column: auto; }
   .journey { grid-template-columns: 1fr; }
 }
 

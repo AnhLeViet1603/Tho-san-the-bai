@@ -167,5 +167,28 @@ console.log('▸ Màn Thẻ tiến hoá');
 await go('the-bai');
 check('hiện nhóm có thẻ', await count('[data-rarity-group]') === 3 && await count('[data-rarity-group=SR] .pcard--sr') === 1);
 
+console.log('▸ Badge thẻ học sinh ở màn hẹp');
+await ev(`(() => {
+  const T = TSTB;
+  const sid = T.db.scalar("SELECT id FROM students WHERE name = 'An'");
+  T.store.set({ classId: T.db.scalar('SELECT class_id FROM students WHERE id = ?', [sid]) });
+  const w = { year: T.store.state.year, month: T.store.state.month, week: T.store.state.week };
+  T.cards.list().forEach(c => T.evolutions.grant(sid, c, w));
+})()`);
+await b.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+await go('rung');
+await go('the-bai');
+const chips = await ev(`(() => {
+  const r = [...document.querySelectorAll('table.pick .held-chips .chip')].map(c => c.getBoundingClientRect());
+  let n = 0;
+  for (let i = 0; i < r.length; i++) for (let j = i + 1; j < r.length; j++)
+    if (r[i].left < r[j].right - 1 && r[j].left < r[i].right - 1 && r[i].top < r[j].bottom - 1 && r[j].top < r[i].bottom - 1) n++;
+  return { n: r.length, overlaps: n };
+})()`);
+check('màn 390px: các badge thẻ không đè lên nhau', chips.n >= 5 && chips.overlaps === 0, chips);
+await ev("document.querySelector('table.pick').scrollIntoView({ block: 'start' })");
+await shot('badge-mobile');
+await b.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+
 check('không có lỗi JS', !b.pageErrors.length, b.pageErrors);
 b.finish();

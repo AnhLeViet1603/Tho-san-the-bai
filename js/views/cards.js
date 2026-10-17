@@ -54,8 +54,9 @@
             const left = T.evolutions.pending(totals[s.id] || 0, flips[s.id]);
             return `<tr data-id="${s.id}">
               <td><b>${esc(s.name)}</b></td><td class="atp">${totals[s.id] || 0}</td>
-              <td>${mine.map(c => `<span class="chip" title="${esc(c.description)} · ${T.evolutions.expiryText(c)}">${esc(c.icon || '🃏')} ${esc(c.name)}</span>`).join(' ')
-                || '<span class="muted">—</span>'}</td>
+              <td>${mine.length ? `<div class="held-chips">${mine.map(c =>
+                `<span class="chip" title="${esc(c.description)} · ${T.evolutions.expiryText(c)}">${esc(c.icon || '🃏')} ${esc(c.name)}</span>`).join('')}</div>`
+                : '<span class="muted">—</span>'}</td>
               <td class="row-actions">${left ? `<button type="button" class="btn sm evo-btn" data-act="evolve">🧬 Lật thẻ${left > 1 ? ` (×${left})` : ''}</button>` : ''}</td>
             </tr>`;
           }).join('')}</tbody></table>`
