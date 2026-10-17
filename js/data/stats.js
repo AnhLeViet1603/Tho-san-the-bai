@@ -80,6 +80,8 @@
       p.push(...f.classIds);
     }
     if (f.year) { w.push('v.year = ?'); p.push(Number(f.year)); }
+    if (f.month) { w.push('v.month = ?'); p.push(Number(f.month)); }
+    if (f.week) { w.push('v.week = ?'); p.push(Number(f.week)); }
     if (f.scope === 'school') {
       const r = T.schoolYear.range();
       w.push('v.granted_at >= ? AND v.granted_at < ?');

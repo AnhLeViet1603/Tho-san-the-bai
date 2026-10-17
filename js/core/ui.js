@@ -205,5 +205,10 @@ window.TSTB = window.TSTB || {};
   const empty = (icon, title, text, action) =>
     `<div class="empty"><div class="empty-ico">${icon}</div><h3>${esc(title)}</h3><p>${esc(text)}</p>${action || ''}</div>`;
 
-  T.ui = { esc, toast, modal, confirm, form, resizeImage, cardHtml, empty };
+  // Thanh tab con: items = [[khoá, nhãn], …]; nút mang data-sub="<prefix><khoá>", màn gọi tự bắt sự kiện bấm
+  const subTabs = (items, current, prefix = '') => `<div class="subtabs" role="tablist">${items.map(([k, label]) =>
+    `<button type="button" role="tab" data-sub="${prefix}${k}" class="${current === k ? 'on' : ''}"
+      aria-selected="${current === k}">${label}</button>`).join('')}</div>`;
+
+  T.ui = { esc, toast, modal, confirm, form, resizeImage, cardHtml, empty, subTabs };
 })(window.TSTB);

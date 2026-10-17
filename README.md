@@ -32,7 +32,7 @@ Lần chạy đầu tiên ứng dụng tự tạo cơ sở dữ liệu và 5 th�
 | 🃏 **Thẻ tiến hoá** | Mỗi thẻ là một đặc quyền có hạn sử dụng. Tự đặt tên, nội dung và ảnh cho từng lá. |
 | ✎ **Sửa thẻ của học sinh** | Trong bảng thẻ của từng em: sửa ngày hết hạn, đổi sang loại thẻ khác, hoặc xoá thẻ (có hoặc không trả lại lượt lật). Xoá nhầm thì hoàn tác trong Lịch sử thẻ. |
 | 🐾 **Chia nhóm trong tiết** | Chia ngẫu nhiên hoặc kéo thả. Cộng điểm cho nhóm thì mọi thành viên đều nhận ATP. |
-| 📊 **Thống kê** | Biểu đồ tròn, biểu đồ cột theo lớp, thời gian, loại hoạt động, nhóm, học sinh; kèm bảng xếp hạng. |
+| 📊 **Thống kê** | 3 tab con dùng chung bộ lọc (lớp, năm học, tháng, tuần, học sinh): **Tổng quan** (chỉ số chính + bảng xếp hạng), **ATP** (biểu đồ theo loại, lớp, thời gian, nhóm, Top 10), **Thẻ** (thẻ tiến hoá đã lật). |
 | 📥 **Nhập từ Excel** | Chọn file `.xlsx` / `.xls` / `.csv`, chọn cột họ tên, xem trước rồi nhập. Tên trùng được bỏ qua. |
 | 💾 **Sao lưu** | Xuất toàn bộ dữ liệu ra một file `.sqlite`, nhập lại trên máy khác — hoặc bật **tự lưu ra file** để ứng dụng tự ghi sau mỗi thay đổi. Nhắc sao lưu khi quá 7 ngày. |
 | 📸 **Bản chụp tự động** | Chụp lại dữ liệu mỗi ngày và trước mọi thao tác thay toàn bộ dữ liệu; khôi phục trong Cài đặt → Dữ liệu › Bản chụp. |
@@ -126,6 +126,7 @@ node tests/ui/save-ui.mjs
 node tests/ui/rules-ui.mjs
 node tests/ui/file-sink-ui.mjs
 node tests/ui/backup-ui.mjs
+node tests/ui/stats-ui.mjs
 
 # Thử tay quyền ghi file (hộp hỏi quyền không tự động hoá được): mở tests/manual/fs-probe.html
 ```
