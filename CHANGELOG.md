@@ -2,7 +2,9 @@
 
 Mỗi phiên bản có một mục `## [x.y.z] - ngày`. Khi phát hành, nội dung của mục đó được dùng làm ghi chú release.
 
-## [Chưa phát hành]
+## [1.3.0] - 2026-10-17
+
+Bản này thêm **độ hiếm cho thẻ tiến hoá** (R / SR / SSR) và chia lại màn **Thống kê** thành các tab con.
 
 ### Độ hiếm thẻ R / SR / SSR
 
@@ -19,6 +21,16 @@ Mỗi phiên bản có một mục `## [x.y.z] - ngày`. Khi phát hành, nội 
 - Màn Thống kê chia thành 3 tab con dùng chung bộ lọc: **Tổng quan**, **ATP**, **Thẻ**.
 - Thống kê thẻ lọc được theo tháng / tuần.
 - Tab Thẻ: số SR / SSR đã phát, phân bố độ hiếm, độ hiếm theo lớp và bảng R / SR / SSR theo từng học sinh. Đổi cấp một loại thẻ không làm đổi số liệu của các lá đã phát.
+- Biểu đồ xếp đủ hàng ở màn rộng; trên điện thoại (hoặc khi thu hẹp cửa sổ) biểu đồ co theo màn hình và nằm giữa khung thay vì bị đẩy lệch sang phải.
+
+### Sửa lỗi giao diện
+
+- Màn Thẻ tiến hoá: các thẻ học sinh đang giữ không còn đè lên nhau trên điện thoại.
+
+### Nâng cấp từ bản cũ
+
+- Dữ liệu tự nâng cấp khi mở ứng dụng (có bản chụp trước khi nâng cấp). Mọi loại thẻ và lá thẻ đã phát được tính là **R**; vào Cài đặt → Thẻ tiến hoá để chuyển thẻ sang SR / SSR.
+- Bộ 12 thẻ mẫu mới chỉ có ở dữ liệu tạo mới; bộ thẻ đang dùng giữ nguyên.
 
 ## [1.2.0] - 2026-10-16
 

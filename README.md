@@ -141,7 +141,7 @@ Test giao diện tự tìm Edge hoặc Chrome ở đường dẫn cài đặt m�
 Lịch sử thay đổi nằm ở [CHANGELOG.md](CHANGELOG.md). Để ra một bản mới:
 
 1. Sửa số trong `js/version.js` và thêm mục `## [x.y.z] - ngày` vào `CHANGELOG.md`, rồi commit và push.
-2. Tạo và push tag trùng số đó: `git tag v1.2.0 && git push origin v1.2.0`.
+2. Tạo và push tag trùng số đó: `git tag v1.3.0 && git push origin v1.3.0`.
 
 GitHub Actions (`.github/workflows/release.yml`) sẽ chạy test, đóng zip và tạo release kèm file zip.
 
