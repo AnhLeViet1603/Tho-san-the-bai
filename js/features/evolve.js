@@ -3,15 +3,6 @@
   'use strict';
   const { esc } = T.ui;
 
-  function shuffled(list) {
-    const a = list.slice();
-    for (let i = a.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [a[i], a[j]] = [a[j], a[i]];
-    }
-    return a;
-  }
-
   // Lý do không lật được (màn lật mở từ trước, dữ liệu đã đổi ở chỗ khác)
   const FLIP_FAIL = {
     'no-flip': s => `${s.name} không còn lượt lật thẻ (ATP vừa thay đổi)`,
@@ -37,12 +28,12 @@
       T.ui.toast('Chưa có thẻ tiến hoá nào. Hãy thêm thẻ trong Cài đặt.', 'warn');
       return;
     }
-    const pool = T.evolutions.available(student.id);
-    if (!pool.length) {
+    // Các lá úp chia theo tỉ lệ độ hiếm; có thể trùng loại khi một cấp ít thẻ
+    const picks = T.rarity.deal(student.id, T.evolutions.choices());
+    if (!picks.length) {
       T.ui.toast(`${student.name} đang giữ đủ mọi loại thẻ. Hãy dùng bớt thẻ rồi lật tiếp.`, 'warn');
       return;
     }
-    const picks = shuffled(pool).slice(0, Math.min(T.evolutions.choices(), pool.length));
 
     const wrap = document.createElement('div');
     wrap.className = 'evo';
