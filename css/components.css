@@ -59,7 +59,7 @@
 .table th { color: var(--muted); font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; font-weight: 600; }
 .table tbody tr:hover { background: rgba(95, 224, 138, .05); }
 .table tr.off td { opacity: .5; }
-.table.sortable th[data-sort] { cursor: pointer; }
+.table.sortable th[data-sort], .table.sortable th[data-card-sort] { cursor: pointer; }
 .table.sortable th.on { color: var(--leaf); }
 .table.sortable th.on::after { content: " ▾"; }
 .row-actions { display: flex; gap: 5px; justify-content: flex-end; flex-wrap: wrap; }
@@ -177,6 +177,7 @@
 }
 @keyframes shimmer { from { background-position: 100% 0; } to { background-position: -150% 0; } }
 .rarity-group + .rarity-group { margin-top: 22px; }
+.rarity-sr-text { color: #c9a6ff; }
 
 /* Tỉ lệ độ hiếm: thanh 3 màu R | SR | SSR với 2 núm */
 .rarity-box {

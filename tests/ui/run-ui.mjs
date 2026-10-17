@@ -463,7 +463,7 @@ await group('9. Thống kê', async () => {
   await sleep(300);
   await click('[data-sub="cards"]');
   await sleep(300);
-  check('tab Thẻ: 1 khung biểu đồ, ẩn Loại/Nguồn/Tiết', await count('.chart-box') === 1
+  check('tab Thẻ: 3 khung biểu đồ, ẩn Loại/Nguồn/Tiết', await count('.chart-box') === 3
     && await count('[data-f="type"], [data-f="source"], [data-f="period"]') === 0);
   check('đổi tab giữ nguyên bộ lọc', await ev("document.querySelector('[data-f=year]').value") !== '');
   await click('#resetFilter');

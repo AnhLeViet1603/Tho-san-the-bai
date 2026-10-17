@@ -50,7 +50,7 @@ check('tab ATP: 6 khung biểu đồ, không quá 6 canvas', await count('.chart
 check('tab ATP: có bộ lọc Loại/Nguồn/Tiết', await count('[data-f="type"], [data-f="source"], [data-f="period"]') === 3);
 
 await click('[data-sub="cards"]');
-check('tab Thẻ: 1 biểu đồ', await count('.chart-box') === 1 && await count('canvas') === 1);
+check('tab Thẻ: 3 khung biểu đồ (theo loại, độ hiếm, độ hiếm theo lớp)', await count('.chart-box') === 3 && await count('canvas') === 3);
 check('tab Thẻ: ẩn Loại/Nguồn/Tiết', await count('[data-f="type"], [data-f="source"], [data-f="period"]') === 0);
 check('tab Thẻ: chưa lọc thì 3 lá', /3 lá/.test(await cardsNote()), await cardsNote());
 
@@ -68,6 +68,42 @@ check('KPI thẻ ở Tổng quan cũng theo bộ lọc', /1 \/ 0/.test(await tex
 await click('[data-sub="cards"]');
 await click('#resetFilter');
 check('Xoá bộ lọc giữ nguyên tab Thẻ', await text('.subtabs .on') === '🃏 Thẻ' && /3 lá/.test(await cardsNote()));
+
+console.log('▸ Độ hiếm');
+// Lớp 11B2: phát 3 R, 2 SR, 1 SSR
+const cls = await ev(`(() => {
+  const T = TSTB;
+  const cid = T.classes.save({ name: '11B2', icon: '🌿', color: '#5fe08a', note: '' });
+  T.students.bulkAdd(cid, ['Hoa', 'Minh']);
+  const [h, m] = T.students.list(cid).map(s => s.id);
+  const mk = (name, rarity) => T.cards.get(T.cards.save({ name, description: '', icon: '🃏', expire_days: 0, rarity }));
+  const w = { year: T.store.state.year, month: 10, week: 1 };
+  const R = T.cards.list().filter(c => c.rarity === 'R');
+  T.evolutions.grant(h, R[0], w); T.evolutions.grant(h, R[1], w); T.evolutions.grant(m, R[0], w);
+  T.evolutions.grant(h, mk('Phượng', 'SR'), w); T.evolutions.grant(m, mk('Hạc', 'SR'), w);
+  T.evolutions.grant(m, mk('Rồng', 'SSR'), w);
+  return cid;
+})()`);
+await go('rung'); // rời rồi quay lại để tab Thống kê vẽ lại với lớp mới
+await go('thong-ke');
+await ev(`document.querySelector('[data-class="${cls}"]').click()`);
+await sleep(300);
+const kpis = await ev("[...document.querySelectorAll('.kpi b')].map(b => b.innerText)");
+check('KPI SR / SSR đã phát: 2 / 1', /2$/.test(kpis[1]) && /1$/.test(kpis[2]), kpis);
+const rows = await ev("[...document.querySelectorAll('.rarity-table tbody tr')].map(r => [...r.cells].slice(1).map(c => c.innerText).join('|'))");
+check('bảng học sinh: R / SR / SSR / tổng', rows.includes('Hoa|11B2|2|1|0|3') && rows.includes('Minh|11B2|1|1|1|3'), rows);
+const pie = await ev("Chart.getChart(document.querySelector('#cRarity canvas')).data.datasets[0].data");
+check('biểu đồ tròn độ hiếm 3 / 2 / 1', pie.join() === '3,2,1', pie);
+const bar = await ev("Chart.getChart(document.querySelector('#cRarityClass canvas')).data.datasets.map(d => d.data.join())");
+check('cột chồng theo lớp 3 / 2 / 1', bar.join('|') === '3|2|1', bar);
+await click('[data-card-sort="SSR"]');
+check('sắp xếp bảng theo SSR', (await ev("document.querySelector('.rarity-table tbody tr td:nth-child(2)').innerText")) === 'Minh');
+await ev("TSTB.cards.save(Object.assign({}, TSTB.cards.list().find(c => c.name === 'Phượng'), { rarity: 'R' }))");
+await click('[data-sub="overview"]');
+await click('[data-sub="cards"]');
+const pie2 = await ev("Chart.getChart(document.querySelector('#cRarity canvas')).data.datasets[0].data");
+check('đổi Phượng SR → R sau khi phát: số liệu cũ không đổi', pie2.join() === '3,2,1', pie2);
+await shot('do-hiem');
 
 check('không có lỗi JS', !b.pageErrors.length, b.pageErrors);
 b.finish();
