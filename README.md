@@ -30,9 +30,10 @@ Lần chạy đầu tiên ứng dụng tự tạo cơ sở dữ liệu và 5 th�
 |---|---|
 | ⚡ **Cộng ATP một lần bấm** | Phát biểu, điểm 8–9, điểm 9+ hoặc một số tuỳ ý. Chọn nhiều em để cộng cùng lúc, bấm nhầm thì hoàn tác. |
 | 🃏 **Thẻ tiến hoá** | Mỗi thẻ là một đặc quyền có hạn sử dụng. Tự đặt tên, nội dung và ảnh cho từng lá. |
+| ✨ **Độ hiếm R / SR / SSR** | Mỗi loại thẻ thuộc một cấp độ hiếm, có khung và hiệu ứng lật riêng. Kéo thanh trượt 2 núm trong Cài đặt để chỉnh tỉ lệ ra R / SR / SSR. |
 | ✎ **Sửa thẻ của học sinh** | Trong bảng thẻ của từng em: sửa ngày hết hạn, đổi sang loại thẻ khác, hoặc xoá thẻ (có hoặc không trả lại lượt lật). Xoá nhầm thì hoàn tác trong Lịch sử thẻ. |
 | 🐾 **Chia nhóm trong tiết** | Chia ngẫu nhiên hoặc kéo thả. Cộng điểm cho nhóm thì mọi thành viên đều nhận ATP. |
-| 📊 **Thống kê** | 3 tab con dùng chung bộ lọc (lớp, năm học, tháng, tuần, học sinh): **Tổng quan** (chỉ số chính + bảng xếp hạng), **ATP** (biểu đồ theo loại, lớp, thời gian, nhóm, Top 10), **Thẻ** (thẻ tiến hoá đã lật). |
+| 📊 **Thống kê** | 3 tab con dùng chung bộ lọc (lớp, năm học, tháng, tuần, học sinh): **Tổng quan** (chỉ số chính + bảng xếp hạng), **ATP** (biểu đồ theo loại, lớp, thời gian, nhóm, Top 10), **Thẻ** (thẻ đã lật theo loại và theo độ hiếm, theo lớp và từng học sinh). |
 | 📥 **Nhập từ Excel** | Chọn file `.xlsx` / `.xls` / `.csv`, chọn cột họ tên, xem trước rồi nhập. Tên trùng được bỏ qua. |
 | 💾 **Sao lưu** | Xuất toàn bộ dữ liệu ra một file `.sqlite`, nhập lại trên máy khác — hoặc bật **tự lưu ra file** để ứng dụng tự ghi sau mỗi thay đổi. Nhắc sao lưu khi quá 7 ngày. |
 | 📸 **Bản chụp tự động** | Chụp lại dữ liệu mỗi ngày và trước mọi thao tác thay toàn bộ dữ liệu; khôi phục trong Cài đặt → Dữ liệu › Bản chụp. |
@@ -43,7 +44,7 @@ Lần chạy đầu tiên ứng dụng tự tạo cơ sở dữ liệu và 5 th�
 
 1. **Săn ATP** — phát biểu và đạt điểm cao để nhận năng lượng. Điểm của nhóm cũng tính cho từng em.
 2. **Chạm mốc** — cứ đủ một mốc ATP trong năm học, học sinh có thêm một lượt lật thẻ.
-3. **Lật thẻ** — chọn một trong các thẻ đang úp.
+3. **Lật thẻ** — chọn một trong các thẻ đang úp. Mỗi lá úp có thể là R, SR hay SSR theo tỉ lệ giáo viên đặt; các lá trông giống hệt nhau cho tới khi lật.
 4. **Dùng đặc quyền** — từ tuần kế tiếp, giáo viên bấm vào thẻ của em để sử dụng. Thẻ quá hạn tự biến mất.
 
 Mỗi loại thẻ chỉ giữ tối đa một lá. Sang năm học mới, ATP tính lại từ đầu (dữ liệu cũ vẫn còn trong thống kê).
@@ -58,6 +59,7 @@ Giá trị mặc định, đều chỉnh được trong **Cài đặt**:
 | Mốc ATP để lật thẻ | 50 |
 | Số thẻ úp mỗi lần lật | 3 |
 | Hạn dùng thẻ | 30 ngày |
+| Tỉ lệ độ hiếm R / SR / SSR | 70% / 25% / 5% |
 
 ## Dữ liệu và sao lưu
 
@@ -127,6 +129,7 @@ node tests/ui/rules-ui.mjs
 node tests/ui/file-sink-ui.mjs
 node tests/ui/backup-ui.mjs
 node tests/ui/stats-ui.mjs
+node tests/ui/rarity-ui.mjs
 
 # Thử tay quyền ghi file (hộp hỏi quyền không tự động hoá được): mở tests/manual/fs-probe.html
 ```
