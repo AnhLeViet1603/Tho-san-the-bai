@@ -276,9 +276,12 @@
   }
 
   // ---------- Thẻ bài ----------
-  async function cardForm(c) {
+  // rarity: độ hiếm mặc định khi thêm (theo nhóm vừa bấm "＋ Thêm")
+  async function cardForm(c, rarity) {
     const v = await T.ui.form(c ? 'Sửa thẻ tiến hoá' : 'Thêm thẻ tiến hoá', [
       { name: 'name', label: 'Tên thẻ', value: c && c.name, required: true },
+      { name: 'rarity', label: 'Độ hiếm', type: 'select', value: c ? T.cards.rarityOf(c.rarity) : rarity || 'R',
+        options: T.cards.RARITIES.map(r => ({ value: r, label: T.cards.rarityLabel(r) })) },
       { name: 'description', label: 'Đặc quyền của thẻ', type: 'textarea', value: c && c.description, placeholder: 'Ví dụ: +1 điểm vào bài kiểm tra 15 phút' },
       { name: 'expire_days', label: 'Hạn sử dụng (ngày)', type: 'number', min: 0,
         value: c ? c.expire_days : T.settings.num('card_expire_days', 30), required: true,
@@ -307,12 +310,13 @@
           Nhập 0 nếu không giới hạn. Áp dụng cho các lần lật sau, thẻ học sinh đang giữ vẫn theo hạn cũ.
           Muốn đặt hạn riêng cho một thẻ, bấm “Sửa / đổi ảnh” trên thẻ đó.</small>
       </form>
-      ${cards.length ? `<div class="pcard-grid">${cards.map(c => T.ui.cardHtml(c, {
-        footer: `<span class="muted">${T.cards.expiryLabel(c)}</span>
+      ${cards.length ? '' : T.ui.empty('🃏', 'Chưa có thẻ tiến hoá', 'Thêm thẻ kèm đặc quyền để học sinh có thể lật.')}
+      ${T.ui.cardGroups(cards, {
+        head: r => `<button type="button" class="btn sm ghost" data-act="add" data-rarity="${r}">＋ Thêm thẻ ${r}</button>`,
+        foot: c => `<span class="muted">${T.cards.expiryLabel(c)}</span>
           <button type="button" class="btn sm ghost" data-act="edit">Sửa / đổi ảnh</button>
           <button type="button" class="btn sm danger" data-act="del">Xoá</button>`
-      })).join('')}</div>`
-      : T.ui.empty('🃏', 'Chưa có thẻ tiến hoá', 'Thêm thẻ kèm đặc quyền để học sinh có thể lật.')}`;
+      })}`;
     body.querySelector('#expiryForm').onsubmit = e => {
       e.preventDefault();
       const days = Math.max(0, Math.trunc(Number(e.target.elements.days.value) || 0));
@@ -326,7 +330,7 @@
     body.onclick = async e => {
       const btn = e.target.closest('[data-act]');
       if (!btn) return;
-      if (btn.dataset.act === 'add') return cardForm(null);
+      if (btn.dataset.act === 'add') return cardForm(null, btn.dataset.rarity);
       const c = cards.find(x => x.id === Number(btn.closest('[data-card]').dataset.card));
       if (btn.dataset.act === 'edit') return cardForm(c);
       const held = T.cards.holders(c.id);

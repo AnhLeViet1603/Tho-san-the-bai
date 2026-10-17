@@ -187,19 +187,36 @@ window.TSTB = window.TSTB || {};
     });
   }
 
-  // HTML một lá bài. opts: { footer }
+  // HTML một lá bài (mặt trước, khung theo độ hiếm). opts: { footer }
   function cardHtml(card, opts = {}) {
     const art = card.image_data
       ? `<img src="${esc(card.image_data)}" alt="">`
       : `<span class="pcard-emoji">${esc(card.icon || '🃏')}</span>`;
-    return `<div class="pcard" data-card="${card.id}">
-      <div class="pcard-art">${art}</div>
+    const r = T.cards.rarityOf(card.rarity);
+    return `<div class="pcard pcard--${r.toLowerCase()}" data-card="${card.id}">
+      <div class="pcard-art">${art}<span class="rbadge rbadge--${r.toLowerCase()}">${r}</span></div>
       <div class="pcard-info">
         <b>${esc(card.name)}</b>
         ${card.description ? `<p>${esc(card.description)}</p>` : ''}
       </div>
       ${opts.footer ? `<div class="pcard-foot">${opts.footer}</div>` : ''}
     </div>`;
+  }
+
+  // Bộ thẻ chia theo độ hiếm R → SSR, mỗi nhóm có tiêu đề + số thẻ.
+  // opts: { foot(card) → footer của từng lá, head(rarity) → HTML thêm vào tiêu đề nhóm, skipEmpty }
+  function cardGroups(cards, opts = {}) {
+    return T.cards.RARITIES.map(r => {
+      const mine = cards.filter(c => T.cards.rarityOf(c.rarity) === r);
+      if (!mine.length && opts.skipEmpty) return '';
+      return `<section class="rarity-group" data-rarity-group="${r}">
+        <div class="rarity-head"><h3><span class="rbadge rbadge--${r.toLowerCase()}">${r}</span>
+          ${esc(T.cards.rarityLabel(r).split(' · ')[1])} <small class="muted">(${mine.length} thẻ)</small></h3>
+          ${opts.head ? opts.head(r) : ''}</div>
+        ${mine.length ? `<div class="pcard-grid">${mine.map(c => cardHtml(c, { footer: opts.foot && opts.foot(c) })).join('')}</div>`
+        : `<p class="muted">Chưa có thẻ ${r}.</p>`}
+      </section>`;
+    }).join('');
   }
 
   const empty = (icon, title, text, action) =>
@@ -210,5 +227,5 @@ window.TSTB = window.TSTB || {};
     `<button type="button" role="tab" data-sub="${prefix}${k}" class="${current === k ? 'on' : ''}"
       aria-selected="${current === k}">${label}</button>`).join('')}</div>`;
 
-  T.ui = { esc, toast, modal, confirm, form, resizeImage, cardHtml, empty, subTabs };
+  T.ui = { esc, toast, modal, confirm, form, resizeImage, cardHtml, cardGroups, empty, subTabs };
 })(window.TSTB);

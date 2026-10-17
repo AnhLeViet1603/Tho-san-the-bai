@@ -40,8 +40,7 @@
             Mỗi loại thẻ chỉ giữ 1 lá, có hạn dùng và không dùng được trong tuần vừa nhận.</p></div>
         <a class="btn ghost" href="#/cai-dat">Sửa bộ thẻ</a>
       </header>
-      ${cards.length ? `<div class="pcard-grid">${cards.map(c =>
-        T.ui.cardHtml(c, { footer: `<span class="muted">${T.cards.expiryLabel(c)}</span>` })).join('')}</div>`
+      ${cards.length ? T.ui.cardGroups(cards, { skipEmpty: true, foot: c => `<span class="muted">${T.cards.expiryLabel(c)}</span>` })
       : T.ui.empty('🃏', 'Chưa có thẻ tiến hoá', 'Thêm thẻ trong phần Cài đặt → Thẻ tiến hoá.')}
       ${cls ? `<div class="panel">
         <div class="panel-head">
