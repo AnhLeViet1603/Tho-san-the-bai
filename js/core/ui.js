@@ -219,6 +219,26 @@ window.TSTB = window.TSTB || {};
     }).join('');
   }
 
+  // Thanh 2 núm chia 0–100 thành 3 đoạn [0, a) · [a, b) · [b, 100]. Hai input range chồng nhau nên kéo bằng
+  // chuột, cảm ứng và bàn phím đều được. Gắn sự kiện bằng bindDualRange().
+  const dualRange = (name, a, b) => `<div class="dual-range" data-dual="${name}" style="--a:${a}%;--b:${b}%">
+    <input type="range" min="0" max="100" step="1" value="${a}" data-knob="a" aria-label="Mốc thứ nhất">
+    <input type="range" min="0" max="100" step="1" value="${b}" data-knob="b" aria-label="Mốc thứ hai"></div>`;
+
+  // onInput({ a, b }) mỗi khi kéo; luôn giữ a ≤ b (núm này không vượt qua núm kia). Trả về set(a, b) để đặt lại.
+  function bindDualRange(box, onInput) {
+    const [ka, kb] = box.querySelectorAll('input');
+    const paint = () => {
+      box.style.setProperty('--a', ka.value + '%');
+      box.style.setProperty('--b', kb.value + '%');
+      onInput({ a: Number(ka.value), b: Number(kb.value) });
+    };
+    ka.addEventListener('input', () => { if (Number(ka.value) > Number(kb.value)) ka.value = kb.value; paint(); });
+    kb.addEventListener('input', () => { if (Number(kb.value) < Number(ka.value)) kb.value = ka.value; paint(); });
+    paint();
+    return (a, b) => { ka.value = a; kb.value = b; paint(); };
+  }
+
   const empty = (icon, title, text, action) =>
     `<div class="empty"><div class="empty-ico">${icon}</div><h3>${esc(title)}</h3><p>${esc(text)}</p>${action || ''}</div>`;
 
@@ -227,5 +247,5 @@ window.TSTB = window.TSTB || {};
     `<button type="button" role="tab" data-sub="${prefix}${k}" class="${current === k ? 'on' : ''}"
       aria-selected="${current === k}">${label}</button>`).join('')}</div>`;
 
-  T.ui = { esc, toast, modal, confirm, form, resizeImage, cardHtml, cardGroups, empty, subTabs };
+  T.ui = { esc, toast, modal, confirm, form, resizeImage, cardHtml, cardGroups, dualRange, bindDualRange, empty, subTabs };
 })(window.TSTB);

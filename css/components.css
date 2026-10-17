@@ -177,6 +177,35 @@
 }
 @keyframes shimmer { from { background-position: 100% 0; } to { background-position: -150% 0; } }
 .rarity-group + .rarity-group { margin-top: 22px; }
+
+/* Tỉ lệ độ hiếm: thanh 3 màu R | SR | SSR với 2 núm */
+.rarity-box {
+  display: grid; gap: 10px; margin-top: 12px; padding: 14px; border-radius: 12px;
+  background: rgba(168, 116, 255, .07); border: 1px solid rgba(168, 116, 255, .3);
+}
+.rarity-label { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.warn-text { color: var(--atp); font-size: .85rem; }
+.dual-range {
+  position: relative; height: 34px; border-radius: 99px; max-width: 560px;
+  background: linear-gradient(90deg, var(--leaf) 0 var(--a), #a874ff var(--a) var(--b), #ffc94a var(--b) 100%) center / 100% 12px no-repeat;
+}
+.dual-range input {
+  position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0;
+  background: none; border: 0; pointer-events: none; -webkit-appearance: none; appearance: none;
+}
+.dual-range input:focus { box-shadow: none; }
+.dual-range input::-webkit-slider-runnable-track { background: none; border: 0; }
+.dual-range input::-moz-range-track { background: none; border: 0; }
+.dual-range input::-webkit-slider-thumb {
+  -webkit-appearance: none; pointer-events: auto; width: 24px; height: 24px; border-radius: 50%; cursor: grab;
+  background: #f2fff5; border: 3px solid #0d2317; box-shadow: 0 2px 8px rgba(0, 0, 0, .5);
+}
+.dual-range input::-moz-range-thumb {
+  pointer-events: auto; width: 18px; height: 18px; border-radius: 50%; cursor: grab;
+  background: #f2fff5; border: 3px solid #0d2317; box-shadow: 0 2px 8px rgba(0, 0, 0, .5);
+}
+.dual-range input:focus-visible::-webkit-slider-thumb { outline: 3px solid var(--atp); outline-offset: 1px; }
+.dual-range input:focus-visible::-moz-range-thumb { outline: 3px solid var(--atp); outline-offset: 1px; }
 .rarity-head { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin: 14px 0 10px; }
 .rarity-head h3 { display: flex; align-items: center; gap: 8px; }
 @media (prefers-reduced-motion: reduce) { .pcard--ssr .pcard-art::after { animation: none; } }
