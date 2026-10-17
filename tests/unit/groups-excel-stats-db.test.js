@@ -177,6 +177,21 @@ test('thống kê thẻ: đếm cả thẻ đã dùng và đã hết hạn', asy
   assert.equal(T.stats.evolution({ studentId: ids[1] }).flips, 1);
 });
 
+test('thống kê thẻ: lọc theo tháng / tuần nhận thẻ', async () => {
+  const { T } = await boot();
+  const { ids } = seedClass(T);
+  const [a, b] = T.cards.list();
+  T.evolutions.grant(ids[0], a, { year: 2026, month: 10, week: 2 });
+  T.evolutions.grant(ids[1], a, { year: 2026, month: 10, week: 3 });
+  T.evolutions.grant(ids[0], b, { year: 2026, month: 11, week: 2 });
+  assert.equal(T.stats.evolution({}).flips, 3);
+  assert.equal(T.stats.evolution({ month: '10' }).flips, 2);
+  assert.equal(T.stats.evolution({ month: 11 }).rows[0].key, b.name);
+  assert.equal(T.stats.evolution({ week: '2' }).flips, 2);
+  assert.equal(T.stats.evolution({ month: 10, week: 3 }).flips, 1);
+  assert.equal(T.stats.evolution({ month: 12 }).flips, 0);
+});
+
 // ---------- Nhập / xuất & nâng cấp ----------
 
 test('xuất rồi nhập lại khôi phục nguyên vẹn dữ liệu', async () => {
