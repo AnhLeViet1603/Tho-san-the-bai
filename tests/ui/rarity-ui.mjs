@@ -96,6 +96,53 @@ check('mọi lượt lật đều ra SSR', await ev(`(() => {
   return true;
 })()`));
 
+console.log('▸ Màn lật thẻ: lá úp không lộ gì');
+// Tỉ lệ 34 / 33 / 33 để 3 lá thường khác cấp nhau; An (lớp 10A1 vừa tạo) được 150 ATP = 3 lượt lật
+await ev(`(() => {
+  const T = TSTB;
+  T.settings.set('rarity_cut_sr', 34); T.settings.set('rarity_cut_ssr', 67);
+  const sid = T.db.scalar("SELECT id FROM students WHERE name = 'An'");
+  T.store.set({ classId: T.db.scalar('SELECT class_id FROM students WHERE id = ?', [sid]) });
+  T.atp.award([sid], T.lessons.current().id, 'manual', { amount: 150 });
+  T.evolve.open({ id: sid, name: 'An' });
+})()`);
+await sleep(700);
+const names = await ev("TSTB.cards.list().map(c => c.name)");
+const flips = await ev(`[...document.querySelectorAll('.evo .flip')].map(f => f.outerHTML
+  .replace(/ data-i="\\d+"/, '').replace(/--delay:\\d+ms/, '').replace(/aria-label="[^"]*"/, ''))`);
+check('3 lá úp', flips.length === 3);
+check('outerHTML 3 lá úp giống hệt nhau', flips.every(h => h === flips[0]), flips[0]);
+const evoHtml = await ev("document.querySelector('.evo').outerHTML");
+check('DOM không có mặt trước, tên hay độ hiếm thẻ', await count('.evo .flip-front, .evo .pcard, .evo [data-card], .evo [class*=rarity]') === 0
+  && !names.some(n => evoHtml.includes(n)) && !/\b(SSR|SR)\b|rbadge/.test(evoHtml));
+await click('.evo .flip');
+const grant = await ev("TSTB.db.get('SELECT rarity, card_id FROM student_cards ORDER BY id DESC LIMIT 1')");
+const cls = 'rarity-' + grant.rarity.toLowerCase();
+check('sau khi chọn: chỉ 1 mặt trước, của đúng lá đã nhận', await count('.evo .flip-front') === 1
+  && await count(`.flip.picked .pcard[data-card="${grant.card_id}"]`) === 1);
+check('class cấp đúng trên .evo và .flip.picked', await count(`.evo.${cls} .flip.picked.${cls}`) === 1, cls);
+check('các lá không chọn vẫn úp và mờ', await count('.flip.dim') === 2 && await count('.flip.dim .flip-front') === 0);
+await sleep(2200);
+check('hiện kết quả', await ev("!document.querySelector('.evo-result').hidden"));
+await shot('lat-' + grant.rarity);
+await click('.evo-result [data-close]');
+
+console.log('▸ Lật SSR');
+// Dùng hết lá đang giữ để thẻ SSR duy nhất chắc chắn lật được
+await ev(`(() => { const T = TSTB; T.settings.set('rarity_cut_sr', 0); T.settings.set('rarity_cut_ssr', 0);
+  const sid = T.db.scalar("SELECT id FROM students WHERE name = 'An'");
+  T.evolutions.heldBy(sid).forEach(c => T.evolutions.use(c.grant_id, null));
+  T.evolve.open({ id: sid, name: 'An' }); })()`);
+await sleep(700);
+await click('.evo .flip');
+check('SSR: class rarity-ssr', await count('.evo.rarity-ssr .flip.picked.rarity-ssr') === 1);
+await sleep(1000);
+check('SSR: kết quả chưa hiện sau 1 giây (hiệu ứng dài hơn R)', await ev("document.querySelector('.evo-result').hidden"));
+await sleep(1300);
+check('SSR: kết quả hiện sau ~2 giây', await ev("!document.querySelector('.evo-result').hidden"));
+await shot('lat-SSR-xong');
+await click('.evo-result [data-close]');
+
 console.log('▸ Màn Thẻ tiến hoá');
 await go('the-bai');
 check('hiện nhóm có thẻ', await count('[data-rarity-group]') === 3 && await count('[data-rarity-group=SR] .pcard--sr') === 1);
