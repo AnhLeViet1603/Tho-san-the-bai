@@ -141,11 +141,24 @@ await ev(`(() => { const T = TSTB; T.settings.set('rarity_cut_sr', 0); T.setting
   T.evolutions.heldBy(sid).forEach(c => T.evolutions.use(c.grant_id, null));
   T.evolve.open({ id: sid, name: 'An' }); })()`);
 await sleep(700);
-await click('.evo .flip');
+// Lấy mẫu từng khung hình: mặt đang hướng ra (dấu cos góc lật = m11) và góc rung (thuộc tính rotate)
+const frames = await ev(`new Promise(res => {
+  const el = document.querySelector('.evo .flip');
+  el.click();
+  const inner = el.querySelector('.flip-inner');
+  const out = []; const t0 = performance.now();
+  (function tick() {
+    const cs = getComputedStyle(inner);
+    out.push({ t: performance.now() - t0, back: new DOMMatrix(cs.transform).m11 >= 0, rotate: cs.rotate,
+      hidden: document.querySelector('.evo-result').hidden });
+    if (performance.now() - t0 < 2300) requestAnimationFrame(tick); else res(out);
+  })();
+})`);
 check('SSR: class rarity-ssr', await count('.evo.rarity-ssr .flip.picked.rarity-ssr') === 1);
-await sleep(1000);
-check('SSR: kết quả chưa hiện sau 1 giây (hiệu ứng dài hơn R)', await ev("document.querySelector('.evo-result').hidden"));
-await sleep(1300);
+const flipsAt = frames.filter((f, i) => i && f.back !== frames[i - 1].back).map(f => Math.round(f.t));
+check('SSR: lật đúng 1 lần, không nháy giữa mặt úp và mặt ngửa', flipsAt.length === 1 && !frames.at(-1).back, flipsAt);
+check('SSR: thẻ rung trước khi lật', frames.some(f => f.back && f.rotate !== 'none' && f.rotate !== '0deg'));
+check('SSR: kết quả chưa hiện trước ~1,8 giây (hiệu ứng dài hơn R)', frames.filter(f => f.t < 1800).every(f => f.hidden));
 check('SSR: kết quả hiện sau ~2 giây', await ev("!document.querySelector('.evo-result').hidden"));
 await shot('lat-SSR-xong');
 await click('.evo-result [data-close]');
