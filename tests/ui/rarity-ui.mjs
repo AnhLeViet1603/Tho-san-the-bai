@@ -29,7 +29,14 @@ console.log('▸ Cài đặt → Thẻ tiến hoá: nhóm theo độ hiếm');
 await go('cai-dat');
 await click('[data-tab="cards"]');
 check('3 nhóm R / SR / SSR', await count('[data-rarity-group]') === 3);
-check('thẻ mẫu đều là R', await count('[data-rarity-group=R] .pcard') === 5 && await count('.pcard--sr, .pcard--ssr') === 0);
+check('bộ thẻ mẫu 5 R · 4 SR · 3 SSR', await count('[data-rarity-group=R] .pcard--r') === 5
+  && await count('[data-rarity-group=SR] .pcard--sr') === 4 && await count('[data-rarity-group=SSR] .pcard--ssr') === 3);
+// Bỏ thẻ SR / SSR mẫu (xoá vĩnh viễn) để các bước sau bắt đầu từ nhóm SR, SSR trống
+await ev(`TSTB.cards.list().filter(c => c.rarity !== 'R').forEach(c => { TSTB.cards.remove(c.id); TSTB.cards.purge(c.id); })`);
+await go('rung');
+await go('cai-dat');
+await click('[data-tab="cards"]');
+check('chỉ còn 5 thẻ R', await count('.pcard') === 5 && await count('.pcard--sr, .pcard--ssr') === 0);
 
 for (const [r, name] of [['R', 'Thẻ Rêu'], ['SR', 'Thẻ Phượng'], ['SSR', 'Thẻ Rồng']]) {
   await click(`[data-act="add"][data-rarity="${r}"]`);

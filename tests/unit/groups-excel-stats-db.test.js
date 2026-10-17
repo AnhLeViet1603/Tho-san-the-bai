@@ -259,7 +259,7 @@ test('xoá toàn bộ dữ liệu đưa về trạng thái ban đầu kèm bộ 
   T.cards.list().forEach(c => T.cards.remove(c.id));
   await T.db.reset();
   assert.equal(T.classes.list().length, 0);
-  assert.equal(T.cards.list().length, 5);
+  assert.equal(T.cards.list().length, 12);
   assert.equal(T.settings.num('atp_speak'), 1);
 });
 

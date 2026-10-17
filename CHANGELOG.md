@@ -12,6 +12,7 @@ Mỗi phiên bản có một mục `## [x.y.z] - ngày`. Khi phát hành, nội 
 - Khung thẻ riêng theo cấp: R viền xanh lá, SR viền tím ánh nhẹ, SSR viền vàng cầu vồng ánh chạy.
 - Màn lật thẻ: các lá úp giống hệt nhau cho tới khi chọn; lật ra SR có tia sáng tím, SSR có tia cầu vồng và hạt lấp lánh.
 - Luôn chia đủ số lá úp, kể cả khi một cấp có ít loại thẻ (khi đó có thể trùng loại trong cùng một lượt).
+- Bộ thẻ mẫu cho dữ liệu mới có 12 thẻ: 5 R, 4 SR, 3 SSR, đặc quyền tăng dần theo độ hiếm.
 
 ### Thống kê
 

@@ -22,7 +22,7 @@
 
 Dữ liệu của bản web và bản tải về nằm ở hai nơi riêng trong trình duyệt. Muốn chuyển qua lại thì xuất file sao lưu ở bên này rồi nhập vào bên kia.
 
-Lần chạy đầu tiên ứng dụng tự tạo cơ sở dữ liệu và 5 thẻ mẫu, và hỏi bạn có file sao lưu để nhập không. Vào **Cài đặt** để tạo lớp và nhập danh sách học sinh.
+Lần chạy đầu tiên ứng dụng tự tạo cơ sở dữ liệu và 12 thẻ mẫu (5 R, 4 SR, 3 SSR), và hỏi bạn có file sao lưu để nhập không. Vào **Cài đặt** để tạo lớp và nhập danh sách học sinh.
 
 ## Tính năng
 

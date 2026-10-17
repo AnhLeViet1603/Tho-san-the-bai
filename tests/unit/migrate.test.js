@@ -52,7 +52,7 @@ test('DB của bản 1.1.x (chưa có user_version) được nâng cấp, dữ l
   await T.db.init({ storage });
   assert.equal(userVersion(T), T.db.schemaVersion());
   assert.deepEqual(names(T), ['Lop-Cu']);
-  assert.equal(T.db.query('SELECT * FROM cards').length, 5, 'không gieo lại thẻ mẫu');
+  assert.equal(T.db.query('SELECT * FROM cards').length, 12, 'không gieo lại thẻ mẫu');
   const snap = (await T.db.listSnapshots()).find(s => s.reason === 'before-migrate');
   assert.ok(snap, 'có bản chụp trước khi nâng cấp');
   assert.ok(same(storage.map.get(snap.key).bytes, old), 'bản chụp là dữ liệu trước nâng cấp');
