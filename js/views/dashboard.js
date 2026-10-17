@@ -8,6 +8,9 @@
   let timeUnit = 'week';
   let charts = [];
   let sortKey = 'total';
+  // Tab con đang mở (nhớ trong phiên làm việc); bộ lọc f dùng chung cho cả 3 tab
+  const TABS = [['overview', '📋 Tổng quan'], ['atp', '⚡ ATP'], ['cards', '🃏 Thẻ']];
+  let tab = 'overview';
 
   const range = (a, b) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
 
@@ -65,18 +68,15 @@
     const students = stuClasses.flatMap(id => T.students.list(id, true));
     if (f.studentId && !students.some(s => s.id === Number(f.studentId))) f.studentId = '';
 
-    const sum = T.stats.summary(f);
-    const evo = T.stats.evolution(f);
-    const ranking = T.stats.ranking(f);
-    ranking.sort((a, b) => sortKey === 'name' ? a.name.localeCompare(b.name, 'vi') : b[sortKey] - a[sortKey]);
-
-    const th = (key, label) => `<th data-sort="${key}" class="${sortKey === key ? 'on' : ''}">${label}</th>`;
+    // Tab Thẻ: Loại/Nguồn/Tiết không áp dụng cho thẻ nên ẩn
+    const atpOnly = tab !== 'cards';
 
     el.innerHTML = `
       <header class="page-head">
         <div><h1>📊 Thống kê hệ sinh thái</h1><p>Lọc theo lớp, thời gian, loại hoạt động và học sinh.</p></div>
         <button type="button" class="btn ghost" id="resetFilter">Xoá bộ lọc</button>
       </header>
+      ${T.ui.subTabs(TABS, tab)}
       <div class="panel filters">
         <div class="class-chips">
           <span class="muted">Lớp:</span>
@@ -91,56 +91,18 @@
           ${select('year', 'Năm', T.stats.years().map(y => [y, String(y)]))}
           ${select('month', 'Tháng', range(1, 12).map(v => [v, 'Tháng ' + v]))}
           ${select('week', 'Tuần', range(1, 5).map(v => [v, 'Tuần ' + v]))}
-          ${select('period', 'Tiết', range(1, 10).map(v => [v, 'Tiết ' + v]))}
-          ${select('type', 'Loại', Object.entries(T.atp.TYPES).map(([k, v]) => [k, v.label]))}
-          ${select('source', 'Nguồn', [['solo', 'Cá nhân'], ['group', 'Theo nhóm']])}
+          ${atpOnly ? select('period', 'Tiết', range(1, 10).map(v => [v, 'Tiết ' + v])) : ''}
+          ${atpOnly ? select('type', 'Loại', Object.entries(T.atp.TYPES).map(([k, v]) => [k, v.label])) : ''}
+          ${atpOnly ? select('source', 'Nguồn', [['solo', 'Cá nhân'], ['group', 'Theo nhóm']]) : ''}
           ${select('studentId', 'Học sinh', students.map(s => [s.id, s.name]))}
         </div>
       </div>
+      <div id="statsBody"></div>`;
 
-      <div class="kpis">
-        <div class="kpi"><small>Tổng ATP</small><b class="atp">⚡ ${sum.total}</b></div>
-        <div class="kpi"><small>Lượt phát biểu</small><b>🗣️ ${sum.speak}</b></div>
-        <div class="kpi"><small>Điểm 8–9</small><b>⭐ ${sum.score_8_9}</b></div>
-        <div class="kpi"><small>Điểm 9+</small><b>🌟 ${sum.score_9_plus}</b></div>
-        <div class="kpi"><small>Thẻ đã lật / đã dùng</small><b>🧬 ${evo.flips} / ${evo.used}</b></div>
-        <div class="kpi"><small>Học sinh có ATP / số tiết</small><b>${sum.students} / ${sum.lessons}</b></div>
-      </div>
-
-      <div class="charts">
-        <div class="panel chart"><h3>Tỉ trọng ATP theo loại</h3><div class="chart-box" id="cType"></div></div>
-        <div class="panel chart"><h3>Tỉ trọng ATP theo lớp</h3><div class="chart-box" id="cClassPie"></div></div>
-        <div class="panel chart"><h3>Thẻ tiến hoá đã lật <small class="muted">(theo lớp, năm, học sinh)</small></h3><div class="chart-box" id="cCards"></div></div>
-        <div class="panel chart wide"><h3>ATP theo thời gian
-          <select id="timeUnit"><option value="week" ${timeUnit === 'week' ? 'selected' : ''}>Theo tuần</option>
-          <option value="month" ${timeUnit === 'month' ? 'selected' : ''}>Theo tháng</option></select></h3>
-          <div class="chart-box" id="cTime"></div></div>
-        <div class="panel chart"><h3>So sánh các lớp</h3><div class="chart-box" id="cClassBar"></div></div>
-        <div class="panel chart wide"><h3>Top 10 học sinh</h3><div class="chart-box" id="cTop"></div></div>
-        <div class="panel chart"><h3>ATP theo nhóm</h3><div class="chart-box" id="cGroup"></div></div>
-      </div>
-
-      <div class="panel">
-        <h3>Bảng xếp hạng <small class="muted">(${ranking.length} học sinh · bấm tiêu đề cột để sắp xếp)</small></h3>
-        ${ranking.length ? `<div class="table-wrap"><table class="table sortable"><thead><tr><th>#</th>
-          ${th('name', 'Học sinh')}<th>Lớp</th>${th('speak', 'Phát biểu')}${th('score_8_9', 'Điểm 8–9')}
-          ${th('score_9_plus', 'Điểm 9+')}${th('total', 'ATP')}${th('cards', 'Thẻ đang giữ')}</tr></thead>
-          <tbody>${ranking.map((r, i) => `<tr><td>${i + 1}</td><td>${esc(r.name)}</td><td>${esc(r.class_name)}</td>
-            <td>${r.speak}</td><td>${r.score_8_9}</td><td>${r.score_9_plus}</td>
-            <td class="atp">${r.total}</td><td>🃏 ${r.cards}</td></tr>`).join('')}</tbody></table></div>`
-        : '<p class="muted">Không có dữ liệu phù hợp với bộ lọc.</p>'}
-      </div>`;
-
-    const typeRows = T.stats.byType(f).map(r => ({ key: T.atp.TYPES[r.key].label, total: r.total }));
-    const classRows = T.stats.byClass(f);
-    const cardRows = evo.rows;
-    draw(el, 'cType', 'pie', typeRows);
-    draw(el, 'cClassPie', 'pie', classRows);
-    draw(el, 'cCards', 'pie', cardRows);
-    draw(el, 'cTime', 'bar', T.stats.byTime(f, timeUnit));
-    draw(el, 'cClassBar', 'bar', classRows, { multi: true });
-    draw(el, 'cTop', 'bar', T.stats.topStudents(f, 10), { horizontal: true, color: PALETTE[1] });
-    draw(el, 'cGroup', 'bar', T.stats.byGroup(f), { multi: true });
+    const body = el.querySelector('#statsBody');
+    if (tab === 'atp') renderAtp(body);
+    else if (tab === 'cards') renderCards(body);
+    else renderOverview(body);
 
     el.addEventListener('change', e => {
       const t = e.target;
@@ -153,6 +115,8 @@
       T.router.refresh();
     });
     el.addEventListener('click', e => {
+      const subBtn = e.target.closest('[data-sub]');
+      if (subBtn) { tab = subBtn.dataset.sub; T.router.refresh(); return; }
       const sort = e.target.closest('[data-sort]');
       if (sort) { sortKey = sort.dataset.sort; T.router.refresh(); return; }
       if (e.target.id === 'resetFilter') {
@@ -160,6 +124,72 @@
         T.router.refresh();
       }
     });
+  }
+
+  // ---------- Tổng quan: KPI + bảng xếp hạng ----------
+  function renderOverview(body) {
+    const sum = T.stats.summary(f);
+    const evo = T.stats.evolution(f);
+    const ranking = T.stats.ranking(f);
+    ranking.sort((a, b) => sortKey === 'name' ? a.name.localeCompare(b.name, 'vi') : b[sortKey] - a[sortKey]);
+    const th = (key, label) => `<th data-sort="${key}" class="${sortKey === key ? 'on' : ''}">${label}</th>`;
+
+    body.innerHTML = `
+      <div class="kpis">
+        <div class="kpi"><small>Tổng ATP</small><b class="atp">⚡ ${sum.total}</b></div>
+        <div class="kpi"><small>Lượt phát biểu</small><b>🗣️ ${sum.speak}</b></div>
+        <div class="kpi"><small>Điểm 8–9</small><b>⭐ ${sum.score_8_9}</b></div>
+        <div class="kpi"><small>Điểm 9+</small><b>🌟 ${sum.score_9_plus}</b></div>
+        <div class="kpi"><small>Thẻ đã lật / đã dùng</small><b>🧬 ${evo.flips} / ${evo.used}</b></div>
+        <div class="kpi"><small>Học sinh có ATP / số tiết</small><b>${sum.students} / ${sum.lessons}</b></div>
+      </div>
+
+      <div class="panel">
+        <h3>Bảng xếp hạng <small class="muted">(${ranking.length} học sinh · bấm tiêu đề cột để sắp xếp)</small></h3>
+        ${ranking.length ? `<div class="table-wrap"><table class="table sortable"><thead><tr><th>#</th>
+          ${th('name', 'Học sinh')}<th>Lớp</th>${th('speak', 'Phát biểu')}${th('score_8_9', 'Điểm 8–9')}
+          ${th('score_9_plus', 'Điểm 9+')}${th('total', 'ATP')}${th('cards', 'Thẻ đang giữ')}</tr></thead>
+          <tbody>${ranking.map((r, i) => `<tr><td>${i + 1}</td><td>${esc(r.name)}</td><td>${esc(r.class_name)}</td>
+            <td>${r.speak}</td><td>${r.score_8_9}</td><td>${r.score_9_plus}</td>
+            <td class="atp">${r.total}</td><td>🃏 ${r.cards}</td></tr>`).join('')}</tbody></table></div>`
+        : '<p class="muted">Không có dữ liệu phù hợp với bộ lọc.</p>'}
+      </div>`;
+  }
+
+  // ---------- ATP: 6 biểu đồ ----------
+  function renderAtp(body) {
+    body.innerHTML = `
+      <div class="charts">
+        <div class="panel chart"><h3>Tỉ trọng ATP theo loại</h3><div class="chart-box" id="cType"></div></div>
+        <div class="panel chart"><h3>Tỉ trọng ATP theo lớp</h3><div class="chart-box" id="cClassPie"></div></div>
+        <div class="panel chart wide"><h3>ATP theo thời gian
+          <select id="timeUnit"><option value="week" ${timeUnit === 'week' ? 'selected' : ''}>Theo tuần</option>
+          <option value="month" ${timeUnit === 'month' ? 'selected' : ''}>Theo tháng</option></select></h3>
+          <div class="chart-box" id="cTime"></div></div>
+        <div class="panel chart"><h3>So sánh các lớp</h3><div class="chart-box" id="cClassBar"></div></div>
+        <div class="panel chart wide"><h3>Top 10 học sinh</h3><div class="chart-box" id="cTop"></div></div>
+        <div class="panel chart"><h3>ATP theo nhóm</h3><div class="chart-box" id="cGroup"></div></div>
+      </div>`;
+
+    const typeRows = T.stats.byType(f).map(r => ({ key: T.atp.TYPES[r.key].label, total: r.total }));
+    const classRows = T.stats.byClass(f);
+    draw(body, 'cType', 'pie', typeRows);
+    draw(body, 'cClassPie', 'pie', classRows);
+    draw(body, 'cTime', 'bar', T.stats.byTime(f, timeUnit));
+    draw(body, 'cClassBar', 'bar', classRows, { multi: true });
+    draw(body, 'cTop', 'bar', T.stats.topStudents(f, 10), { horizontal: true, color: PALETTE[1] });
+    draw(body, 'cGroup', 'bar', T.stats.byGroup(f), { multi: true });
+  }
+
+  // ---------- Thẻ: thẻ tiến hoá đã lật ----------
+  function renderCards(body) {
+    const evo = T.stats.evolution(f);
+    body.innerHTML = `
+      <div class="charts">
+        <div class="panel chart"><h3>Thẻ tiến hoá đã lật <small class="muted">(${evo.flips} lá · ${evo.used} đã dùng)</small></h3>
+          <div class="chart-box" id="cCards"></div></div>
+      </div>`;
+    draw(body, 'cCards', 'pie', evo.rows);
   }
 
   T.router.register('thong-ke', { label: 'Thống kê', icon: '📊', render });

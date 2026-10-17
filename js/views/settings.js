@@ -15,10 +15,8 @@
   const sub = { classes: 'active', students: 'active', cards: 'active', data: 'backup' };
   const refresh = () => T.router.refresh();
 
-  // Thanh tab con: items = [[khoá, nhãn], …]; bấm thì đổi sub[key] và vẽ lại (xử lý ở render())
-  const subTabs = (key, items) => `<div class="subtabs" role="tablist">${items.map(([k, label]) =>
-    `<button type="button" role="tab" data-sub="${key}:${k}" class="${sub[key] === k ? 'on' : ''}"
-      aria-selected="${sub[key] === k}">${label}</button>`).join('')}</div>`;
+  // Thanh tab con: bấm thì đổi sub[key] và vẽ lại (xử lý ở render())
+  const subTabs = (key, items) => T.ui.subTabs(items, sub[key], key + ':');
 
   // Mở thẳng một tab / tab con của Cài đặt từ chỗ khác (ví dụ thanh bên → Dữ liệu › Sao lưu)
   function open(nextTab, nextSub) {

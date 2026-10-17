@@ -453,8 +453,25 @@ await group('8b. Giáo viên sửa thẻ của học sinh', async () => {
 await group('9. Thống kê', async () => {
   await go('thong-ke');
   await sleep(400);
-  check('7 khung biểu đồ', await count('.chart-box') === 7);
-  check('có biểu đồ được vẽ', await count('.chart-box canvas') >= 5, await count('.chart-box canvas'));
+  check('3 tab con, mặc định Tổng quan', await count('.subtabs [data-sub]') === 3 && await text('.subtabs .on') === '📋 Tổng quan');
+  check('Tổng quan: KPI + bảng, không có biểu đồ', await count('.kpi') === 6 && await count('canvas') === 0);
+  await click('[data-sub="atp"]');
+  await sleep(300);
+  check('tab ATP: 6 khung biểu đồ', await count('.chart-box') === 6, await count('.chart-box'));
+  check('tab ATP: có biểu đồ được vẽ, không quá 6 canvas', await count('canvas') >= 4 && await count('canvas') <= 6, await count('canvas'));
+  await fill('[data-f="year"]', await ev("document.querySelector('[data-f=year] option:last-child').value"));
+  await sleep(300);
+  await click('[data-sub="cards"]');
+  await sleep(300);
+  check('tab Thẻ: 1 khung biểu đồ, ẩn Loại/Nguồn/Tiết', await count('.chart-box') === 1
+    && await count('[data-f="type"], [data-f="source"], [data-f="period"]') === 0);
+  check('đổi tab giữ nguyên bộ lọc', await ev("document.querySelector('[data-f=year]').value") !== '');
+  await click('#resetFilter');
+  await sleep(300);
+  check('Xoá bộ lọc giữ nguyên tab', await text('.subtabs .on') === '🃏 Thẻ' && await ev("document.querySelector('[data-f=year]').value") === '');
+  await shot('09-thong-ke-the');
+  await click('[data-sub="overview"]');
+  await sleep(300);
   const total = await text('.kpi b');
   await fill('[data-f="type"]', 'speak');
   await sleep(300);
