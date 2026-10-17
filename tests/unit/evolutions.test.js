@@ -344,3 +344,20 @@ test('discard: xoá thẻ không trả lượt lật, có trong lịch sử và 
   T.evolutions.discard(id);
   assert.equal(T.db.scalar('SELECT status FROM student_cards WHERE id = ?', [id]), 'used', 'không đụng tới lá đã dùng');
 });
+
+test('độ hiếm: lưu chuẩn hoá về R; lá phát ra giữ snapshot độ hiếm, đổi loại thẻ về sau không đổi lịch sử; swap cập nhật theo thẻ mới', async () => {
+  const { T } = await boot();
+  const { ids } = seedClass(T);
+  const ssr = T.cards.get(T.cards.save({ name: 'Rồng', description: '', icon: '🐉', expire_days: 0, rarity: 'SSR' }));
+  const odd = T.cards.get(T.cards.save({ name: 'Lạ', description: '', icon: '❓', expire_days: 0, rarity: 'XYZ' }));
+  assert.equal(ssr.rarity, 'SSR');
+  assert.equal(odd.rarity, 'R');
+  assert.equal(T.cards.list().pop().id, ssr.id, 'list sắp R → SSR');
+  T.evolutions.grant(ids[0], ssr, WEEK);
+  T.cards.save(Object.assign({}, ssr, { rarity: 'R' }));
+  const rarityOfGrant = () => T.db.scalar('SELECT rarity FROM student_cards WHERE student_id = ?', [ids[0]]);
+  assert.equal(rarityOfGrant(), 'SSR', 'snapshot giữ nguyên khi đổi độ hiếm loại thẻ');
+  const sr = T.cards.get(T.cards.save({ name: 'Phượng', description: '', icon: '🦚', expire_days: 0, rarity: 'SR' }));
+  assert.ok(T.evolutions.swap(T.evolutions.heldBy(ids[0])[0].grant_id, sr.id));
+  assert.equal(rarityOfGrant(), 'SR');
+});

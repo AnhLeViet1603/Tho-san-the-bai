@@ -61,7 +61,10 @@
     atp_score_9_plus: '3',
     evolve_threshold: '50',
     evolve_choices: '3',
-    card_expire_days: '30'
+    card_expire_days: '30',
+    // Tỉ lệ độ hiếm khi lật thẻ: 2 mốc cắt trên thanh 0–100 → R [0, cut_sr) · SR [cut_sr, cut_ssr) · SSR [cut_ssr, 100)
+    rarity_cut_sr: '70',
+    rarity_cut_ssr: '95'
   };
 
   const SEED_CARDS = [
@@ -303,6 +306,19 @@
       if (!query('PRAGMA table_info(students)').some(c => c.name === 'archived_at')) {
         d.run('ALTER TABLE students ADD COLUMN archived_at INTEGER');
       }
+    },
+
+    // 7: độ hiếm thẻ R / SR / SSR. student_cards.rarity là độ hiếm của loại thẻ lúc phát (snapshot),
+    // để giáo viên đổi độ hiếm loại thẻ về sau không làm sai lịch sử. Thẻ và lá cũ đều là R.
+    d => {
+      if (!query('PRAGMA table_info(cards)').some(c => c.name === 'rarity')) {
+        d.run("ALTER TABLE cards ADD COLUMN rarity TEXT NOT NULL DEFAULT 'R'");
+      }
+      if (!query('PRAGMA table_info(student_cards)').some(c => c.name === 'rarity')) {
+        d.run('ALTER TABLE student_cards ADD COLUMN rarity TEXT');
+      }
+      d.run(`UPDATE student_cards SET rarity = COALESCE((SELECT k.rarity FROM cards k WHERE k.id = student_cards.card_id), 'R')
+        WHERE rarity IS NULL`);
     }
   ];
 

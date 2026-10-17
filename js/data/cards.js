@@ -5,21 +5,28 @@
   const ICONS = ['🦠', '🧫', '🪸', '🍄', '🌱', '🐛', '🦋', '🐟', '🐸', '🦎', '🐢', '🦖',
     '🦕', '🦅', '🦉', '🐺', '🦊', '🐘', '🦧', '🧬', '⚡', '🔥', '🛡️', '👑'];
 
-  // Chỉ các loại thẻ đang dùng; loại đã xoá (archived) vẫn còn trong DB để lịch sử hiển thị được
-  const list = () => T.db.query('SELECT * FROM cards WHERE archived = 0 ORDER BY sort_order, id');
+  // Độ hiếm, từ thường tới hiếm nhất
+  const RARITIES = ['R', 'SR', 'SSR'];
+  const rarityOf = r => (RARITIES.includes(r) ? r : 'R');
+  const rarityLabel = r => ({ R: 'R · Thường', SR: 'SR · Hiếm', SSR: 'SSR · Siêu hiếm' })[rarityOf(r)];
+  const RARITY_ORDER = "CASE rarity WHEN 'SSR' THEN 2 WHEN 'SR' THEN 1 ELSE 0 END";
+
+  // Chỉ các loại thẻ đang dùng (theo độ hiếm R → SSR); loại đã xoá (archived) vẫn còn trong DB để lịch sử hiển thị được
+  const list = () => T.db.query(`SELECT * FROM cards WHERE archived = 0 ORDER BY ${RARITY_ORDER}, sort_order, id`);
   const get = id => T.db.get('SELECT * FROM cards WHERE id = ?', [id]);
 
   // expire_days = 0: thẻ không hết hạn
   function save(c) {
-    const vals = [c.name, c.description, c.icon, c.image_data || null, Math.max(0, Math.trunc(c.expire_days) || 0)];
+    const vals = [c.name, c.description, c.icon, c.image_data || null, Math.max(0, Math.trunc(c.expire_days) || 0),
+      rarityOf(c.rarity)];
     if (c.id) {
-      T.db.run('UPDATE cards SET name = ?, description = ?, icon = ?, image_data = ?, expire_days = ? WHERE id = ?',
+      T.db.run('UPDATE cards SET name = ?, description = ?, icon = ?, image_data = ?, expire_days = ?, rarity = ? WHERE id = ?',
         [...vals, c.id]);
       return c.id;
     }
     const order = T.db.scalar('SELECT COALESCE(MAX(sort_order), -1) + 1 FROM cards');
     return T.db.insert(
-      'INSERT INTO cards (name, description, icon, image_data, expire_days, sort_order) VALUES (?, ?, ?, ?, ?, ?)',
+      'INSERT INTO cards (name, description, icon, image_data, expire_days, rarity, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [...vals, order]);
   }
 
@@ -78,5 +85,5 @@
 
   const expiryLabel = c => (c.expire_days > 0 ? `⏳ Hạn ${c.expire_days} ngày` : '∞ Không hết hạn');
 
-  T.cards = { ICONS, list, get, save, remove, trash, restore, purge, holders, named, expiryLabel };
+  T.cards = { ICONS, RARITIES, rarityOf, rarityLabel, list, get, save, remove, trash, restore, purge, holders, named, expiryLabel };
 })(window.TSTB);
