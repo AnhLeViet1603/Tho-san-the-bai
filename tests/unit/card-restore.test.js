@@ -27,7 +27,7 @@ test('khôi phục loại thẻ: về cuối bộ thẻ, trả lại đúng các
   assert.deepEqual(T.cards.trash().map(c => [c.id, c.issued, c.returnable]), [[a.id, 2, 1]]);
   assert.equal(T.cards.restore(a.id), 1);
 
-  assert.equal(T.cards.list().at(-1).id, a.id, 'về cuối bộ thẻ');
+  assert.equal(T.cards.list().filter(c => c.rarity === a.rarity).at(-1).id, a.id, 'về cuối nhóm độ hiếm của nó');
   assert.equal(T.cards.trash().length, 0);
   assert.deepEqual(T.evolutions.heldBy(ids[0]).map(c => c.id).sort(), [a.id, b.id].sort(), 'lá của em 0 được trả lại');
   assert.deepEqual(T.evolutions.heldBy(ids[1]), [], 'lá em 1 bị xoá từ trước thì không tự trả');

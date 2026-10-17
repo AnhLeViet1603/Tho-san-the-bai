@@ -71,29 +71,35 @@
       (SELECT COUNT(*) FROM student_cards v WHERE v.student_id = s.id AND v.status = 'held') AS cards`,
     'GROUP BY s.id ORDER BY total DESC, s.name');
 
-  // Số lượt lật theo từng loại thẻ (lọc theo lớp, năm, học sinh)
-  function evolution(f) {
+  // Điều kiện lọc lá thẻ đã phát (bảng student_cards v, students s): bỏ lá 'revoked', lớp / học sinh trong thùng rác
+  function cardWhere(f) {
     const w = ['s.class_id IN (SELECT id FROM classes WHERE archived_at IS NULL)', "v.status != 'revoked'"];
     const p = [];
     if (f.classIds && f.classIds.length) {
       w.push(`s.class_id IN (${f.classIds.map(() => '?').join(',')})`);
       p.push(...f.classIds);
     }
-    if (f.year) { w.push('v.year = ?'); p.push(Number(f.year)); }
-    if (f.month) { w.push('v.month = ?'); p.push(Number(f.month)); }
-    if (f.week) { w.push('v.week = ?'); p.push(Number(f.week)); }
+    ['year', 'month', 'week'].forEach(k => {
+      if (f[k]) { w.push(`v.${k} = ?`); p.push(Number(f[k])); }
+    });
     if (f.scope === 'school') {
       const r = T.schoolYear.range();
       w.push('v.granted_at >= ? AND v.granted_at < ?');
       p.push(r.startMs, r.endMs);
     }
     if (f.studentId) { w.push('v.student_id = ?'); p.push(Number(f.studentId)); }
+    return { sql: w.join(' AND '), params: p };
+  }
+
+  const CARD_FROM = `FROM student_cards v JOIN students s ON s.id = v.student_id AND s.archived_at IS NULL`;
+
+  // Số lượt lật theo từng loại thẻ (lọc theo lớp, năm, tháng, tuần, học sinh); rarity: độ hiếm hiện tại của loại thẻ
+  function evolution(f) {
+    const w = cardWhere(f);
     const rows = T.db.query(`
-      SELECT k.name AS key, COUNT(*) AS total, SUM(v.status = 'used') AS used
-      FROM student_cards v
-      JOIN cards k ON k.id = v.card_id
-      JOIN students s ON s.id = v.student_id AND s.archived_at IS NULL
-      WHERE ${w.join(' AND ')} GROUP BY k.id ORDER BY total DESC`, p);
+      SELECT k.name AS key, k.rarity, COUNT(*) AS total, SUM(v.status = 'used') AS used
+      ${CARD_FROM} JOIN cards k ON k.id = v.card_id
+      WHERE ${w.sql} GROUP BY k.id ORDER BY total DESC`, w.params);
     return {
       rows,
       flips: rows.reduce((a, r) => a + r.total, 0),
@@ -101,7 +107,36 @@
     };
   }
 
+  // Đếm theo độ hiếm lúc phát (snapshot student_cards.rarity), không theo độ hiếm hiện tại của loại thẻ
+  const RARITY_COLS = "SUM(v.rarity = 'R') AS R, SUM(v.rarity = 'SR') AS SR, SUM(v.rarity = 'SSR') AS SSR, COUNT(*) AS total";
+
+  // [{ key: 'R' | 'SR' | 'SSR', total }] đủ 3 cấp
+  function byRarity(f) {
+    const w = cardWhere(f);
+    const r = T.db.get(`SELECT ${RARITY_COLS} ${CARD_FROM} WHERE ${w.sql}`, w.params) || {};
+    return T.cards.RARITIES.map(k => ({ key: k, total: r[k] || 0 }));
+  }
+
+  // Mỗi lớp: { key, R, SR, SSR, total }
+  function rarityByClass(f) {
+    const w = cardWhere(f);
+    return T.db.query(`SELECT COALESCE(c.icon, '') || ' ' || c.name AS key, ${RARITY_COLS}
+      ${CARD_FROM} JOIN classes c ON c.id = s.class_id
+      WHERE ${w.sql} GROUP BY c.id ORDER BY c.sort_order, c.id`, w.params);
+  }
+
+  // Mỗi học sinh có lá: { id, name, class_name, R, SR, SSR, total }
+  function rarityByStudent(f) {
+    const w = cardWhere(f);
+    return T.db.query(`SELECT s.id, s.name, c.name AS class_name, ${RARITY_COLS}
+      ${CARD_FROM} JOIN classes c ON c.id = s.class_id
+      WHERE ${w.sql} GROUP BY s.id ORDER BY total DESC, s.name`, w.params);
+  }
+
   const years = () => T.db.query('SELECT DISTINCT year FROM lessons ORDER BY year').map(r => r.year);
 
-  T.stats = { summary, byType, byClass, byTime, topStudents, byGroup, ranking, evolution, years };
+  T.stats = {
+    summary, byType, byClass, byTime, topStudents, byGroup, ranking, evolution,
+    byRarity, rarityByClass, rarityByStudent, years
+  };
 })(window.TSTB);

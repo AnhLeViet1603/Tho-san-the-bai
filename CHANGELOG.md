@@ -2,6 +2,24 @@
 
 Mỗi phiên bản có một mục `## [x.y.z] - ngày`. Khi phát hành, nội dung của mục đó được dùng làm ghi chú release.
 
+## [Chưa phát hành]
+
+### Độ hiếm thẻ R / SR / SSR
+
+- Mỗi loại thẻ thuộc một cấp: **R** (thường), **SR** (hiếm), **SSR** (siêu hiếm). Thẻ có sẵn được tính là R.
+- Cài đặt → Thẻ tiến hoá: bộ thẻ chia thành 3 nhóm, mỗi nhóm có nút "＋ Thêm thẻ R/SR/SSR"; sửa thẻ để đổi cấp.
+- Thanh trượt 2 núm chỉnh tỉ lệ ra R / SR / SSR (mặc định 70% / 25% / 5%), có cảnh báo khi một cấp có tỉ lệ mà chưa có thẻ.
+- Khung thẻ riêng theo cấp: R viền xanh lá, SR viền tím ánh nhẹ, SSR viền vàng cầu vồng ánh chạy.
+- Màn lật thẻ: các lá úp giống hệt nhau cho tới khi chọn; lật ra SR có tia sáng tím, SSR có tia cầu vồng và hạt lấp lánh.
+- Luôn chia đủ số lá úp, kể cả khi một cấp có ít loại thẻ (khi đó có thể trùng loại trong cùng một lượt).
+- Bộ thẻ mẫu cho dữ liệu mới có 12 thẻ: 5 R, 4 SR, 3 SSR, đặc quyền tăng dần theo độ hiếm.
+
+### Thống kê
+
+- Màn Thống kê chia thành 3 tab con dùng chung bộ lọc: **Tổng quan**, **ATP**, **Thẻ**.
+- Thống kê thẻ lọc được theo tháng / tuần.
+- Tab Thẻ: số SR / SSR đã phát, phân bố độ hiếm, độ hiếm theo lớp và bảng R / SR / SSR theo từng học sinh. Đổi cấp một loại thẻ không làm đổi số liệu của các lá đã phát.
+
 ## [1.2.0] - 2026-10-16
 
 Bản này tập trung vào việc **không làm mất dữ liệu** và **khôi phục được khi lỡ tay**.

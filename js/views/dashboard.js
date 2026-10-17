@@ -8,6 +8,9 @@
   let timeUnit = 'week';
   let charts = [];
   let sortKey = 'total';
+  let cardSort = 'total';
+  // Màu theo khung độ hiếm (components.css: .pcard--r|sr|ssr)
+  const RARITY_COLOR = { R: '#5fe08a', SR: '#a874ff', SSR: '#ffc94a' };
   // Tab con đang mở (nhớ trong phiên làm việc); bộ lọc f dùng chung cho cả 3 tab
   const TABS = [['overview', '📋 Tổng quan'], ['atp', '⚡ ATP'], ['cards', '🃏 Thẻ']];
   let tab = 'overview';
@@ -19,6 +22,8 @@
       `<option value="${esc(v)}" ${String(f[key]) === String(v) ? 'selected' : ''}>${esc(text)}</option>`).join('')}</select></label>`;
   }
 
+  // opts: { label (tên số liệu trong tooltip, mặc định ATP), multi, horizontal, color, colors(row) → màu từng cột/miếng,
+  //   series: [[khoá, nhãn, màu], …] → cột chồng, mỗi series một dataset lấy row[khoá] }
   function draw(el, id, type, rows, opts = {}) {
     const box = el.querySelector('#' + id);
     const data = rows.filter(r => type !== 'pie' || r.total > 0);
@@ -33,23 +38,28 @@
       type: pie ? 'doughnut' : 'bar',
       data: {
         labels: data.map(r => r.key),
-        datasets: [{
-          label: 'ATP',
-          data: data.map(r => r.total),
-          backgroundColor: pie || opts.multi ? data.map((_, i) => PALETTE[i % PALETTE.length]) : (opts.color || PALETTE[0]),
-          borderColor: pie ? '#0d2317' : 'transparent',
-          borderWidth: pie ? 2 : 0,
-          borderRadius: pie ? 0 : 6
-        }]
+        datasets: opts.series
+          ? opts.series.map(([key, label, color]) => ({
+            label, data: data.map(r => r[key] || 0), backgroundColor: color, borderWidth: 0, borderRadius: 4
+          }))
+          : [{
+            label: opts.label || 'ATP',
+            data: data.map(r => r.total),
+            backgroundColor: opts.colors ? data.map(opts.colors)
+              : pie || opts.multi ? data.map((_, i) => PALETTE[i % PALETTE.length]) : (opts.color || PALETTE[0]),
+            borderColor: pie ? '#0d2317' : 'transparent',
+            borderWidth: pie ? 2 : 0,
+            borderRadius: pie ? 0 : 6
+          }]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
         indexAxis: opts.horizontal ? 'y' : 'x',
-        plugins: { legend: { display: pie, position: 'bottom' } },
+        plugins: { legend: { display: pie || !!opts.series, position: 'bottom' } },
         scales: pie ? {} : {
-          x: { grid: { display: !!opts.horizontal }, beginAtZero: true },
-          y: { grid: { display: !opts.horizontal }, beginAtZero: true }
+          x: { grid: { display: !!opts.horizontal }, beginAtZero: true, stacked: !!opts.series },
+          y: { grid: { display: !opts.horizontal }, beginAtZero: true, stacked: !!opts.series }
         }
       }
     }));
@@ -97,7 +107,7 @@
           ${select('studentId', 'Học sinh', students.map(s => [s.id, s.name]))}
         </div>
       </div>
-      <div id="statsBody"></div>`;
+      <div id="statsBody" class="stats-body"></div>`;
 
     const body = el.querySelector('#statsBody');
     if (tab === 'atp') renderAtp(body);
@@ -119,6 +129,8 @@
       if (subBtn) { tab = subBtn.dataset.sub; T.router.refresh(); return; }
       const sort = e.target.closest('[data-sort]');
       if (sort) { sortKey = sort.dataset.sort; T.router.refresh(); return; }
+      const cSort = e.target.closest('[data-card-sort]');
+      if (cSort) { cardSort = cSort.dataset.cardSort; T.router.refresh(); return; }
       if (e.target.id === 'resetFilter') {
         Object.assign(f, { classIds: [], scope: 'school', year: '', month: '', week: '', period: '', type: '', source: '', studentId: '' });
         T.router.refresh();
@@ -157,18 +169,19 @@
   }
 
   // ---------- ATP: 6 biểu đồ ----------
+  // Lưới 3 cột, mỗi hàng đủ 3 ô: 3 biểu đồ thường · rộng 2 + thường · cả hàng
   function renderAtp(body) {
     body.innerHTML = `
       <div class="charts">
         <div class="panel chart"><h3>Tỉ trọng ATP theo loại</h3><div class="chart-box" id="cType"></div></div>
         <div class="panel chart"><h3>Tỉ trọng ATP theo lớp</h3><div class="chart-box" id="cClassPie"></div></div>
+        <div class="panel chart"><h3>So sánh các lớp</h3><div class="chart-box" id="cClassBar"></div></div>
         <div class="panel chart wide"><h3>ATP theo thời gian
           <select id="timeUnit"><option value="week" ${timeUnit === 'week' ? 'selected' : ''}>Theo tuần</option>
           <option value="month" ${timeUnit === 'month' ? 'selected' : ''}>Theo tháng</option></select></h3>
           <div class="chart-box" id="cTime"></div></div>
-        <div class="panel chart"><h3>So sánh các lớp</h3><div class="chart-box" id="cClassBar"></div></div>
-        <div class="panel chart wide"><h3>Top 10 học sinh</h3><div class="chart-box" id="cTop"></div></div>
         <div class="panel chart"><h3>ATP theo nhóm</h3><div class="chart-box" id="cGroup"></div></div>
+        <div class="panel chart full"><h3>Top 10 học sinh</h3><div class="chart-box" id="cTop"></div></div>
       </div>`;
 
     const typeRows = T.stats.byType(f).map(r => ({ key: T.atp.TYPES[r.key].label, total: r.total }));
@@ -181,15 +194,41 @@
     draw(body, 'cGroup', 'bar', T.stats.byGroup(f), { multi: true });
   }
 
-  // ---------- Thẻ: thẻ tiến hoá đã lật ----------
+  // ---------- Thẻ: thẻ tiến hoá đã lật, theo loại và độ hiếm ----------
   function renderCards(body) {
     const evo = T.stats.evolution(f);
+    const rarity = T.stats.byRarity(f);
+    const count = r => rarity.find(x => x.key === r).total;
+    const students = T.stats.rarityByStudent(f);
+    students.sort((a, b) => cardSort === 'name' ? a.name.localeCompare(b.name, 'vi') : b[cardSort] - a[cardSort]);
+    const th = (key, label) => `<th data-card-sort="${key}" class="${cardSort === key ? 'on' : ''}">${label}</th>`;
+    const series = T.cards.RARITIES.map(r => [r, r, RARITY_COLOR[r]]);
+
     body.innerHTML = `
+      <div class="kpis">
+        <div class="kpi"><small>Thẻ đã lật / đã dùng</small><b>🧬 ${evo.flips} / ${evo.used}</b></div>
+        <div class="kpi"><small>SR đã phát</small><b class="rarity-sr-text">💜 ${count('SR')}</b></div>
+        <div class="kpi"><small>SSR đã phát</small><b class="atp">🌟 ${count('SSR')}</b></div>
+      </div>
       <div class="charts">
-        <div class="panel chart"><h3>Thẻ tiến hoá đã lật <small class="muted">(${evo.flips} lá · ${evo.used} đã dùng)</small></h3>
+        <div class="panel chart"><h3>Phân bố độ hiếm</h3><div class="chart-box" id="cRarity"></div></div>
+        <div class="panel chart wide"><h3>Độ hiếm theo lớp</h3><div class="chart-box" id="cRarityClass"></div></div>
+        <div class="panel chart full"><h3>Thẻ tiến hoá đã lật <small class="muted">(${evo.flips} lá · ${evo.used} đã dùng)</small></h3>
+          <p class="muted chart-note">Màu theo độ hiếm: xanh R · tím SR · vàng SSR.</p>
           <div class="chart-box" id="cCards"></div></div>
+      </div>
+      <div class="panel">
+        <h3>Thẻ theo học sinh <small class="muted">(${students.length} học sinh · bấm tiêu đề cột để sắp xếp)</small></h3>
+        ${students.length ? `<div class="table-wrap"><table class="table sortable rarity-table"><thead><tr><th>#</th>
+          ${th('name', 'Học sinh')}<th>Lớp</th>${th('R', 'R')}${th('SR', 'SR')}${th('SSR', 'SSR')}${th('total', 'Tổng')}</tr></thead>
+          <tbody>${students.map((s, i) => `<tr><td>${i + 1}</td><td>${esc(s.name)}</td><td>${esc(s.class_name)}</td>
+            <td>${s.R}</td><td>${s.SR}</td><td>${s.SSR}</td><td><b>${s.total}</b></td></tr>`).join('')}</tbody></table></div>`
+        : '<p class="muted">Không có dữ liệu phù hợp với bộ lọc.</p>'}
       </div>`;
-    draw(body, 'cCards', 'pie', evo.rows);
+
+    draw(body, 'cCards', 'pie', evo.rows, { label: 'Số lá', colors: r => RARITY_COLOR[T.cards.rarityOf(r.rarity)] });
+    draw(body, 'cRarity', 'pie', rarity, { label: 'Số lá', colors: r => RARITY_COLOR[r.key] });
+    draw(body, 'cRarityClass', 'bar', T.stats.rarityByClass(f), { series });
   }
 
   T.router.register('thong-ke', { label: 'Thống kê', icon: '📊', render });

@@ -192,6 +192,42 @@ test('thống kê thẻ: lọc theo tháng / tuần nhận thẻ', async () => {
   assert.equal(T.stats.evolution({ month: 12 }).flips, 0);
 });
 
+test('thống kê độ hiếm: đếm theo snapshot lúc phát, lọc lớp / học sinh / năm học, bỏ lá revoked', async () => {
+  const { T } = await boot();
+  const a = seedClass(T, ['An', 'Bình'], '10A1');
+  const b = seedClass(T, ['Hoa'], '11B2');
+  const mk = (name, rarity) => T.cards.get(T.cards.save({ name, description: '', icon: '🃏', expire_days: 0, rarity }));
+  const cards = { R: [mk('R1', 'R'), mk('R2', 'R'), mk('R3', 'R')], SR: [mk('S1', 'SR'), mk('S2', 'SR')], SSR: [mk('X1', 'SSR')] };
+  const week = { year: 2026, month: 10, week: 2 };
+  // Lớp 10A1: 3 R, 2 SR, 1 SSR
+  T.evolutions.grant(a.ids[0], cards.R[0], week);
+  T.evolutions.grant(a.ids[0], cards.R[1], week);
+  T.evolutions.grant(a.ids[1], cards.R[2], week);
+  T.evolutions.grant(a.ids[0], cards.SR[0], week);
+  T.evolutions.grant(a.ids[1], cards.SR[1], week);
+  T.evolutions.grant(a.ids[1], cards.SSR[0], week);
+  // Lớp 11B2: 1 R, rồi 1 lá bị xoá trả lượt (không tính)
+  T.evolutions.grant(b.ids[0], cards.R[0], week);
+  T.evolutions.grant(b.ids[0], cards.SSR[0], week);
+  T.evolutions.revoke(T.db.scalar('SELECT MAX(id) FROM student_cards'));
+
+  const counts = f => Object.fromEntries(T.stats.byRarity(f).map(r => [r.key, r.total]));
+  assert.deepEqual(counts({ classIds: [a.classId] }), { R: 3, SR: 2, SSR: 1 });
+  assert.deepEqual(counts({}), { R: 4, SR: 2, SSR: 1 }, 'lá revoked không tính');
+  assert.deepEqual(counts({ studentId: a.ids[1] }), { R: 1, SR: 1, SSR: 1 });
+  assert.deepEqual(counts({ scope: 'school' }), { R: 4, SR: 2, SSR: 1 });
+  assert.deepEqual(counts({ year: 2025 }), { R: 0, SR: 0, SSR: 0 });
+
+  const byClass = T.stats.rarityByClass({});
+  assert.deepEqual(byClass.map(r => [r.key, r.R, r.SR, r.SSR, r.total]), [['🧬 10A1', 3, 2, 1, 6], ['🧬 11B2', 1, 0, 0, 1]]);
+  const stu = T.stats.rarityByStudent({ classIds: [a.classId] });
+  assert.deepEqual(stu.map(r => [r.name, r.R, r.SR, r.SSR, r.total]), [['An', 2, 1, 0, 3], ['Bình', 1, 1, 1, 3]]);
+
+  // Đổi loại thẻ R1 thành SSR sau khi đã phát: số liệu cũ vẫn là R
+  T.cards.save(Object.assign({}, cards.R[0], { rarity: 'SSR' }));
+  assert.deepEqual(counts({ classIds: [a.classId] }), { R: 3, SR: 2, SSR: 1 });
+});
+
 // ---------- Nhập / xuất & nâng cấp ----------
 
 test('xuất rồi nhập lại khôi phục nguyên vẹn dữ liệu', async () => {
@@ -223,7 +259,7 @@ test('xoá toàn bộ dữ liệu đưa về trạng thái ban đầu kèm bộ 
   T.cards.list().forEach(c => T.cards.remove(c.id));
   await T.db.reset();
   assert.equal(T.classes.list().length, 0);
-  assert.equal(T.cards.list().length, 5);
+  assert.equal(T.cards.list().length, 12);
   assert.equal(T.settings.num('atp_speak'), 1);
 });
 

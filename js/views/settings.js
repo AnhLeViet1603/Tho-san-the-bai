@@ -276,9 +276,12 @@
   }
 
   // ---------- Thẻ bài ----------
-  async function cardForm(c) {
+  // rarity: độ hiếm mặc định khi thêm (theo nhóm vừa bấm "＋ Thêm")
+  async function cardForm(c, rarity) {
     const v = await T.ui.form(c ? 'Sửa thẻ tiến hoá' : 'Thêm thẻ tiến hoá', [
       { name: 'name', label: 'Tên thẻ', value: c && c.name, required: true },
+      { name: 'rarity', label: 'Độ hiếm', type: 'select', value: c ? T.cards.rarityOf(c.rarity) : rarity || 'R',
+        options: T.cards.RARITIES.map(r => ({ value: r, label: T.cards.rarityLabel(r) })) },
       { name: 'description', label: 'Đặc quyền của thẻ', type: 'textarea', value: c && c.description, placeholder: 'Ví dụ: +1 điểm vào bài kiểm tra 15 phút' },
       { name: 'expire_days', label: 'Hạn sử dụng (ngày)', type: 'number', min: 0,
         value: c ? c.expire_days : T.settings.num('card_expire_days', 30), required: true,
@@ -307,12 +310,48 @@
           Nhập 0 nếu không giới hạn. Áp dụng cho các lần lật sau, thẻ học sinh đang giữ vẫn theo hạn cũ.
           Muốn đặt hạn riêng cho một thẻ, bấm “Sửa / đổi ảnh” trên thẻ đó.</small>
       </form>
-      ${cards.length ? `<div class="pcard-grid">${cards.map(c => T.ui.cardHtml(c, {
-        footer: `<span class="muted">${T.cards.expiryLabel(c)}</span>
+      <form class="rarity-box" id="rarityForm">
+        <div class="field"><span>🎲 Tỉ lệ độ hiếm khi lật thẻ</span>
+          ${T.ui.dualRange('rarity', T.rarity.cuts().sr, T.rarity.cuts().ssr)}</div>
+        <p class="rarity-label" id="rarityLabel" aria-live="polite"></p>
+        <div class="row-actions">
+          <button class="btn">Lưu tỉ lệ</button>
+          <button type="button" class="btn ghost" id="rarityDefault">Mặc định</button>
+        </div>
+        <small class="muted">Kéo 2 núm để chia thanh thành 3 đoạn R | SR | SSR. Mỗi lá úp được chia độ hiếm theo tỉ lệ này.</small>
+      </form>
+      ${cards.length ? '' : T.ui.empty('🃏', 'Chưa có thẻ tiến hoá', 'Thêm thẻ kèm đặc quyền để học sinh có thể lật.')}
+      ${T.ui.cardGroups(cards, {
+        head: r => `<button type="button" class="btn sm ghost" data-act="add" data-rarity="${r}">＋ Thêm thẻ ${r}</button>`,
+        foot: c => `<span class="muted">${T.cards.expiryLabel(c)}</span>
           <button type="button" class="btn sm ghost" data-act="edit">Sửa / đổi ảnh</button>
           <button type="button" class="btn sm danger" data-act="del">Xoá</button>`
-      })).join('')}</div>`
-      : T.ui.empty('🃏', 'Chưa có thẻ tiến hoá', 'Thêm thẻ kèm đặc quyền để học sinh có thể lật.')}`;
+      })}`;
+    const rarityForm = body.querySelector('#rarityForm');
+    let cut = T.rarity.cuts();
+    const setCut = T.ui.bindDualRange(rarityForm.querySelector('.dual-range'), ({ a, b }) => {
+      cut = { sr: a, ssr: b };
+      const w = T.rarity.weights(cut);
+      rarityForm.querySelector('#rarityLabel').innerHTML = T.cards.RARITIES.map(r => {
+        const none = w[r] > 0 && !cards.some(c => T.cards.rarityOf(c.rarity) === r);
+        return `<span class="rbadge rbadge--${r.toLowerCase()}">${r}</span> <b>${w[r]}%</b>`
+          + (none ? ` <span class="warn-text">⚠ Chưa có thẻ ${r}</span>` : '');
+      }).join(' · ');
+    });
+    rarityForm.querySelector('#rarityDefault').onclick = () => setCut(70, 95);
+    rarityForm.onsubmit = e => {
+      e.preventDefault();
+      const before = T.rarity.weights();
+      const after = T.rarity.weights(cut);
+      const text = w => T.cards.RARITIES.map(r => `${r} ${w[r]}%`).join(' · ');
+      T.db.tx(() => {
+        T.settings.set('rarity_cut_sr', cut.sr);
+        T.settings.set('rarity_cut_ssr', cut.ssr);
+        T.audit.log('settings.rarity', `Đổi tỉ lệ độ hiếm: ${text(before)} → ${text(after)}`, { before, after });
+      });
+      T.ui.toast('Đã lưu tỉ lệ ' + text(after));
+      refresh();
+    };
     body.querySelector('#expiryForm').onsubmit = e => {
       e.preventDefault();
       const days = Math.max(0, Math.trunc(Number(e.target.elements.days.value) || 0));
@@ -326,7 +365,7 @@
     body.onclick = async e => {
       const btn = e.target.closest('[data-act]');
       if (!btn) return;
-      if (btn.dataset.act === 'add') return cardForm(null);
+      if (btn.dataset.act === 'add') return cardForm(null, btn.dataset.rarity);
       const c = cards.find(x => x.id === Number(btn.closest('[data-card]').dataset.card));
       if (btn.dataset.act === 'edit') return cardForm(c);
       const held = T.cards.holders(c.id);

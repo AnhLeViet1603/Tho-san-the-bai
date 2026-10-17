@@ -26,6 +26,7 @@ const FILES = [
   'js/data/atp.js',
   'js/data/cards.js',
   'js/data/evolutions.js',
+  'js/data/rarity.js',
   'js/data/groups.js',
   'js/data/stats.js',
   'js/data/integrity.js',

@@ -151,6 +151,49 @@ body {
 .flip.picked .pcard { border-color: var(--atp); box-shadow: 0 0 46px rgba(255, 201, 74, .65); }
 .flip.dim { opacity: .12; filter: blur(3px); pointer-events: none; transform: scale(.9); }
 
+/* Hiệu ứng theo độ hiếm — chỉ gắn class sau khi đã bấm chọn nên không lộ gì trước đó.
+   SR: tia sáng tím, thẻ rung nhẹ rồi mới lật. SSR: màn tối lâu hơn, tia cầu vồng, hạt lấp lánh, thẻ phóng to chậm. */
+.flip.picked.rarity-sr .flip-inner { animation: shake .4s ease-in-out .5s; transition-delay: .9s; }
+.flip.picked.rarity-sr .pcard { border-color: #a874ff; box-shadow: 0 0 50px rgba(168, 116, 255, .75); }
+/* Rung bằng rotate / translate riêng (không dùng transform): .flip-inner đang chuyển transform rotateY để lật,
+   keyframe transform sẽ ghi đè góc lật làm thẻ nháy qua lại giữa mặt úp và mặt ngửa. */
+@keyframes shake {
+  20%, 60% { rotate: -3deg; translate: -3px 0; }
+  40%, 80% { rotate: 3deg; translate: 3px 0; }
+}
+.evo.rarity-sr::before {
+  background:
+    repeating-conic-gradient(from 0deg, rgba(168, 116, 255, .2) 0 8deg, transparent 8deg 20deg),
+    radial-gradient(circle, rgba(168, 116, 255, .55), transparent 60%);
+}
+.evo.rarity-sr .evo-result h2 { color: #c9a6ff; text-shadow: 0 0 22px rgba(168, 116, 255, .8); }
+
+.evo.rarity-ssr { background: rgba(0, 0, 0, .99); transition-duration: 1.4s; }
+.flip.picked.rarity-ssr { transition-duration: 1.6s; }
+.flip.picked.rarity-ssr .flip-inner { animation: shake .5s ease-in-out 1s 2; transition-delay: 1.4s; }
+.flip.picked.rarity-ssr .pcard { box-shadow: 0 0 70px rgba(255, 220, 120, .85), 0 0 140px rgba(255, 143, 208, .45); }
+.evo.rarity-ssr::before {
+  background:
+    repeating-conic-gradient(from 0deg, rgba(255, 224, 138, .28) 0 6deg, rgba(255, 143, 208, .16) 6deg 12deg,
+      rgba(143, 216, 255, .16) 12deg 18deg, transparent 18deg 24deg),
+    radial-gradient(circle, rgba(255, 224, 138, .7), transparent 62%);
+  transition: opacity 1.2s 1s, transform 1.8s .9s cubic-bezier(.2, .8, .2, 1);
+}
+.evo.rarity-ssr::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0;
+  background:
+    radial-gradient(2px 2px at 20% 30%, #fff, transparent), radial-gradient(3px 3px at 75% 22%, #ffe08a, transparent),
+    radial-gradient(2px 2px at 35% 70%, #ff8fd0, transparent), radial-gradient(3px 3px at 82% 64%, #8fd8ff, transparent),
+    radial-gradient(2px 2px at 12% 82%, #ffe08a, transparent), radial-gradient(2px 2px at 60% 12%, #fff, transparent),
+    radial-gradient(3px 3px at 48% 88%, #fff, transparent), radial-gradient(2px 2px at 90% 40%, #ff8fd0, transparent);
+  animation: sparkle 1.6s ease-in-out 1.6s infinite alternate;
+}
+@keyframes sparkle { from { opacity: .2; transform: scale(1); } to { opacity: 1; transform: scale(1.04); } }
+.evo.rarity-ssr .evo-result h2 {
+  background: linear-gradient(90deg, #ffe08a, #ff8fd0, #8fd8ff, #ffe08a); -webkit-background-clip: text; background-clip: text;
+  color: transparent; text-shadow: none; filter: drop-shadow(0 0 14px rgba(255, 224, 138, .6));
+}
+
 .evo-result {
   position: absolute; left: 0; right: 0; bottom: 5vh; z-index: 4; padding: 0 20px;
   display: grid; gap: 6px; justify-items: center; text-align: center; animation: rise .5s ease;
@@ -165,6 +208,9 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .flip, .flip-inner, .evo::before { transition-duration: .01s; animation: none; }
+  .flip.picked.rarity-sr .flip-inner, .flip.picked.rarity-ssr .flip-inner { animation: none; transition-delay: 0s; }
+  .flip.picked.rarity-ssr, .evo.rarity-ssr::before { transition-duration: .01s; transition-delay: 0s; }
+  .evo.rarity-ssr::after { animation: none; opacity: .6; }
 }
 
 @media (max-width: 860px) {

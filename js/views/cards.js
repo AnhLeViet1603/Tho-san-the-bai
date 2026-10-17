@@ -40,8 +40,7 @@
             Mỗi loại thẻ chỉ giữ 1 lá, có hạn dùng và không dùng được trong tuần vừa nhận.</p></div>
         <a class="btn ghost" href="#/cai-dat">Sửa bộ thẻ</a>
       </header>
-      ${cards.length ? `<div class="pcard-grid">${cards.map(c =>
-        T.ui.cardHtml(c, { footer: `<span class="muted">${T.cards.expiryLabel(c)}</span>` })).join('')}</div>`
+      ${cards.length ? T.ui.cardGroups(cards, { skipEmpty: true, foot: c => `<span class="muted">${T.cards.expiryLabel(c)}</span>` })
       : T.ui.empty('🃏', 'Chưa có thẻ tiến hoá', 'Thêm thẻ trong phần Cài đặt → Thẻ tiến hoá.')}
       ${cls ? `<div class="panel">
         <div class="panel-head">
@@ -55,8 +54,9 @@
             const left = T.evolutions.pending(totals[s.id] || 0, flips[s.id]);
             return `<tr data-id="${s.id}">
               <td><b>${esc(s.name)}</b></td><td class="atp">${totals[s.id] || 0}</td>
-              <td>${mine.map(c => `<span class="chip" title="${esc(c.description)} · ${T.evolutions.expiryText(c)}">${esc(c.icon || '🃏')} ${esc(c.name)}</span>`).join(' ')
-                || '<span class="muted">—</span>'}</td>
+              <td>${mine.length ? `<div class="held-chips">${mine.map(c =>
+                `<span class="chip" title="${esc(c.description)} · ${T.evolutions.expiryText(c)}">${esc(c.icon || '🃏')} ${esc(c.name)}</span>`).join('')}</div>`
+                : '<span class="muted">—</span>'}</td>
               <td class="row-actions">${left ? `<button type="button" class="btn sm evo-btn" data-act="evolve">🧬 Lật thẻ${left > 1 ? ` (×${left})` : ''}</button>` : ''}</td>
             </tr>`;
           }).join('')}</tbody></table>`

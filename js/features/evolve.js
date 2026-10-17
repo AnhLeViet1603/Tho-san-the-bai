@@ -3,21 +3,16 @@
   'use strict';
   const { esc } = T.ui;
 
-  function shuffled(list) {
-    const a = list.slice();
-    for (let i = a.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [a[i], a[j]] = [a[j], a[i]];
-    }
-    return a;
-  }
-
   // Lý do không lật được (màn lật mở từ trước, dữ liệu đã đổi ở chỗ khác)
   const FLIP_FAIL = {
     'no-flip': s => `${s.name} không còn lượt lật thẻ (ATP vừa thay đổi)`,
     held: (s, c) => `${s.name} đang giữ thẻ ${c.name} rồi`,
     archived: (s, c) => `Thẻ ${c.name} vừa bị xoá khỏi bộ thẻ. Hãy lật lại.`
   };
+
+  // Thời điểm hiện tên + đặc quyền sau khi bấm, theo độ hiếm (hiệu ứng SR / SSR dài hơn)
+  const REVEAL_MS = { R: 1100, SR: 1400, SSR: 2000 };
+  const reducedMotion = () => !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
 
   // Tuần của tiết đang chọn: dùng cho luật "không dùng trong tuần nhận thẻ"
   const now = () => {
@@ -37,12 +32,12 @@
       T.ui.toast('Chưa có thẻ tiến hoá nào. Hãy thêm thẻ trong Cài đặt.', 'warn');
       return;
     }
-    const pool = T.evolutions.available(student.id);
-    if (!pool.length) {
+    // Các lá úp chia theo tỉ lệ độ hiếm; có thể trùng loại khi một cấp ít thẻ
+    const picks = T.rarity.deal(student.id, T.evolutions.choices());
+    if (!picks.length) {
       T.ui.toast(`${student.name} đang giữ đủ mọi loại thẻ. Hãy dùng bớt thẻ rồi lật tiếp.`, 'warn');
       return;
     }
-    const picks = shuffled(pool).slice(0, Math.min(T.evolutions.choices(), pool.length));
 
     const wrap = document.createElement('div');
     wrap.className = 'evo';
@@ -52,11 +47,8 @@
         <p>Chọn 1 trong ${picks.length} thẻ để lật${left > 1 ? ` · còn ${left} lượt lật` : ''}.</p>
       </div>
       <div class="evo-row">${picks.map((c, i) => `
-        <div class="flip" role="button" tabindex="0" data-i="${i}" style="--delay:${i * 90}ms">
-          <div class="flip-inner">
-            <div class="flip-back"><i>🧬</i><b>?</b></div>
-            <div class="flip-front">${T.ui.cardHtml(c)}</div>
-          </div>
+        <div class="flip" role="button" tabindex="0" aria-label="Lá thẻ úp ${i + 1}" data-i="${i}" style="--delay:${i * 90}ms">
+          <div class="flip-inner"><div class="flip-back"><i>🧬</i><b>?</b></div></div>
         </div>`).join('')}</div>
       <div class="evo-result" hidden>
         <small>Đặc quyền của ${esc(student.name)}</small>
@@ -80,6 +72,14 @@
         return close();
       }
 
+      // Mặt trước chỉ được dựng sau khi lật thành công, và chỉ cho lá được chọn: trước đó các lá úp giống hệt nhau,
+      // DOM không chứa tên hay độ hiếm của lá nào (thẻ nằm trong mảng picks).
+      const rarity = T.cards.rarityOf(card.rarity).toLowerCase();
+      el.querySelector('.flip-inner').insertAdjacentHTML('beforeend', `<div class="flip-front">${T.ui.cardHtml(card)}</div>`);
+      void el.offsetWidth; // để trình duyệt vẽ mặt trước trước khi bắt đầu lật
+      wrap.classList.add('rarity-' + rarity);
+      el.classList.add('rarity-' + rarity);
+
       // Đưa thẻ được chọn về giữa màn hình và phóng to
       const r = el.getBoundingClientRect();
       const scale = Math.min(1.9, (innerHeight * 0.56) / r.height, (innerWidth * 0.8) / r.width);
@@ -97,7 +97,7 @@
         res.querySelector('.evo-note').textContent =
           `${T.cards.expiryLabel(card)} · dùng được từ tuần sau`;
         res.hidden = false;
-      }, 1100);
+      }, reducedMotion() ? 400 : REVEAL_MS[T.cards.rarityOf(card.rarity)]);
     }
 
     wrap.addEventListener('click', e => {

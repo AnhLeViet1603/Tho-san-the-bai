@@ -10,7 +10,7 @@
   const SELECT = `
     SELECT v.id AS grant_id, v.student_id, v.status, v.year, v.month, v.week,
       v.granted_at, v.expires_at, v.used_at,
-      k.id, k.name, k.icon, k.description, k.image_data, k.expire_days
+      k.id, k.name, k.icon, k.description, k.image_data, k.expire_days, k.rarity, v.rarity AS grant_rarity
     FROM student_cards v JOIN cards k ON k.id = v.card_id`;
 
   // Thẻ quá hạn mà chưa dùng thì tự mất
@@ -71,9 +71,9 @@
   // when: { year, month, week } của tiết đang dạy. Trả về false nếu đã giữ thẻ này.
   function grant(studentId, card, when) {
     if (holds(studentId, card.id)) return false;
-    T.db.run(`INSERT INTO student_cards (student_id, card_id, year, month, week, granted_at, expires_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [studentId, card.id, when.year, when.month, when.week, Date.now(), expiryFor(card)]);
+    T.db.run(`INSERT INTO student_cards (student_id, card_id, year, month, week, granted_at, expires_at, rarity)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [studentId, card.id, when.year, when.month, when.week, Date.now(), expiryFor(card), T.cards.rarityOf(card.rarity)]);
     return true;
   }
 
@@ -211,7 +211,8 @@
     if (!row || !card || card.archived || row.card_id === card.id || holds(row.student_id, card.id)) return false;
     T.db.tx(() => {
       logCard('card.swap', 'Đổi', grantId, `sang ${T.cards.named(card.name)}`);
-      T.db.run('UPDATE student_cards SET card_id = ?, expires_at = ? WHERE id = ?', [card.id, expiryFor(card), grantId]);
+      T.db.run('UPDATE student_cards SET card_id = ?, expires_at = ?, rarity = ? WHERE id = ?',
+        [card.id, expiryFor(card), T.cards.rarityOf(card.rarity), grantId]);
     });
     return true;
   }

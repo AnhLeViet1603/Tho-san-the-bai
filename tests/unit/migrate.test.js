@@ -52,7 +52,7 @@ test('DB của bản 1.1.x (chưa có user_version) được nâng cấp, dữ l
   await T.db.init({ storage });
   assert.equal(userVersion(T), T.db.schemaVersion());
   assert.deepEqual(names(T), ['Lop-Cu']);
-  assert.equal(T.db.query('SELECT * FROM cards').length, 5, 'không gieo lại thẻ mẫu');
+  assert.equal(T.db.query('SELECT * FROM cards').length, 12, 'không gieo lại thẻ mẫu');
   const snap = (await T.db.listSnapshots()).find(s => s.reason === 'before-migrate');
   assert.ok(snap, 'có bản chụp trước khi nâng cấp');
   assert.ok(same(storage.map.get(snap.key).bytes, old), 'bản chụp là dữ liệu trước nâng cấp');
@@ -155,4 +155,24 @@ test('nhập file mà bước nâng cấp lỗi: giữ nguyên dữ liệu đang
   assert.deepEqual(names(T), ['Lop-Hien-Tai']);
   addClass(T, 'Lop-2');
   assert.deepEqual(names(T), ['Lop-Hien-Tai', 'Lop-2'], 'DB vẫn dùng được');
+});
+
+test('DB bản 1.2.0 (phiên bản 6, chưa có độ hiếm) lên phiên bản 7: mọi thẻ và lá cũ là R, chạy lại không hỏng', async t => {
+  const T = await setup(t);
+  await T.db.init({ storage: fakeStorage() });
+  const cid = addClass(T, 'Lop-Cu');
+  T.students.bulkAdd(cid, ['An']);
+  const sid = T.students.list(cid)[0].id;
+  T.evolutions.grant(sid, T.cards.list()[0], { year: 2026, month: 10, week: 2 });
+  const old = await dbBytes(T, d => {
+    d.run('ALTER TABLE student_cards DROP COLUMN rarity');
+    d.run('ALTER TABLE cards DROP COLUMN rarity');
+    d.run('PRAGMA user_version = 6');
+  });
+  await T.db.init({ storage: storageWith(old) });
+  assert.equal(userVersion(T), 7);
+  assert.deepEqual([...new Set(T.db.query('SELECT rarity FROM cards').map(r => r.rarity))], ['R']);
+  assert.deepEqual(T.db.query('SELECT rarity FROM student_cards').map(r => r.rarity), ['R']);
+  assert.doesNotThrow(() => T.db.MIGRATIONS[6]({ run: (sql, p) => T.db.run(sql, p) }), "chạy lại bước 7 không hỏng");
+  assert.equal(T.db.scalar('SELECT COUNT(*) FROM student_cards WHERE rarity IS NULL'), 0);
 });

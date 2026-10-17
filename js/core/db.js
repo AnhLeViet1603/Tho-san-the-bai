@@ -61,15 +61,27 @@
     atp_score_9_plus: '3',
     evolve_threshold: '50',
     evolve_choices: '3',
-    card_expire_days: '30'
+    card_expire_days: '30',
+    // Tỉ lệ độ hiếm khi lật thẻ: 2 mốc cắt trên thanh 0–100 → R [0, cut_sr) · SR [cut_sr, cut_ssr) · SSR [cut_ssr, 100)
+    rarity_cut_sr: '70',
+    rarity_cut_ssr: '95'
   };
 
+  // Bộ thẻ mẫu cho dữ liệu mới: [tên, đặc quyền, biểu tượng, độ hiếm]. Cấp càng hiếm, đặc quyền càng lớn:
+  // R — tiện lợi nhỏ, không đụng tới điểm; SR — miễn bài / cộng ít điểm bài nhỏ; SSR — cộng điểm bài lớn.
   const SEED_CARDS = [
-    ['Thẻ Tế Bào', 'Được chọn chỗ ngồi trong 1 tuần.', '🦠'],
-    ['Thẻ San Hô', 'Được giáo viên gợi ý 1 lần khi kiểm tra miệng.', '🪸'],
-    ['Thẻ Lưỡng Cư', 'Miễn 1 lần kiểm tra miệng.', '🐸'],
-    ['Thẻ Khủng Long', '+0,5 điểm vào bài kiểm tra 15 phút.', '🦖'],
-    ['Thẻ Linh Trưởng', '+1 điểm vào bài kiểm tra 1 tiết.', '🦧']
+    ['Thẻ Tế Bào', 'Được chọn chỗ ngồi trong 1 tuần.', '🦠', 'R'],
+    ['Thẻ San Hô', 'Được giáo viên gợi ý 1 lần khi kiểm tra miệng.', '🪸', 'R'],
+    ['Thẻ Nấm', 'Được đổi câu hỏi khác 1 lần khi kiểm tra miệng.', '🍄', 'R'],
+    ['Thẻ Sâu Bướm', 'Được nộp bài tập về nhà trễ 1 ngày.', '🐛', 'R'],
+    ['Thẻ Mầm Xanh', 'Được hỏi ý kiến bạn cùng bàn 1 lần khi làm bài trên lớp.', '🌱', 'R'],
+    ['Thẻ Lưỡng Cư', 'Miễn 1 lần kiểm tra miệng.', '🐸', 'SR'],
+    ['Thẻ Cá Vây Thuỳ', 'Miễn 1 bài tập về nhà.', '🐟', 'SR'],
+    ['Thẻ Rùa Cổ', 'Được xem vở ghi 3 phút trong bài kiểm tra 15 phút.', '🐢', 'SR'],
+    ['Thẻ Bướm', '+0,5 điểm vào bài kiểm tra 15 phút.', '🦋', 'SR'],
+    ['Thẻ Khủng Long', '+1 điểm vào bài kiểm tra 15 phút.', '🦖', 'SSR'],
+    ['Thẻ Linh Trưởng', '+1 điểm vào bài kiểm tra 1 tiết.', '🦧', 'SSR'],
+    ['Thẻ Đại Bàng', 'Nhận ngay 1 điểm 10 kiểm tra miệng.', '🦅', 'SSR']
   ];
 
   const SNAP_MAX = 5;
@@ -303,6 +315,19 @@
       if (!query('PRAGMA table_info(students)').some(c => c.name === 'archived_at')) {
         d.run('ALTER TABLE students ADD COLUMN archived_at INTEGER');
       }
+    },
+
+    // 7: độ hiếm thẻ R / SR / SSR. student_cards.rarity là độ hiếm của loại thẻ lúc phát (snapshot),
+    // để giáo viên đổi độ hiếm loại thẻ về sau không làm sai lịch sử. Thẻ và lá cũ đều là R.
+    d => {
+      if (!query('PRAGMA table_info(cards)').some(c => c.name === 'rarity')) {
+        d.run("ALTER TABLE cards ADD COLUMN rarity TEXT NOT NULL DEFAULT 'R'");
+      }
+      if (!query('PRAGMA table_info(student_cards)').some(c => c.name === 'rarity')) {
+        d.run('ALTER TABLE student_cards ADD COLUMN rarity TEXT');
+      }
+      d.run(`UPDATE student_cards SET rarity = COALESCE((SELECT k.rarity FROM cards k WHERE k.id = student_cards.card_id), 'R')
+        WHERE rarity IS NULL`);
     }
   ];
 
@@ -336,8 +361,11 @@
     // Giữ setting để file sao lưu đọc được phiên bản cả khi công cụ khác làm mất user_version
     db.run("UPDATE settings SET value = ? WHERE key = 'schema_version'", [String(latest())]);
     if (!scalar("SELECT value FROM settings WHERE key = 'cards_seeded'")) {
-      SEED_CARDS.forEach((c, i) =>
-        db.run('INSERT INTO cards (name, description, icon, sort_order) VALUES (?, ?, ?, ?)', [...c, i]));
+      // Cột rarity có từ bước nâng cấp 7 (test có thể chạy với danh sách bước rút gọn)
+      const rarity = query('PRAGMA table_info(cards)').some(c => c.name === 'rarity');
+      SEED_CARDS.forEach(([name, description, icon, r], i) => (rarity
+        ? db.run('INSERT INTO cards (name, description, icon, rarity, sort_order) VALUES (?, ?, ?, ?, ?)', [name, description, icon, r, i])
+        : db.run('INSERT INTO cards (name, description, icon, sort_order) VALUES (?, ?, ?, ?)', [name, description, icon, i])));
       db.run("INSERT INTO settings (key, value) VALUES ('cards_seeded', '1')");
     }
   }

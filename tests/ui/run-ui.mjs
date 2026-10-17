@@ -391,7 +391,7 @@ await group('7. Chế độ Nhóm trong Tiết học', async () => {
 
 await group('8. Tab Thẻ tiến hoá', async () => {
   await go('the-bai');
-  check('hiện bộ 5 thẻ kèm hạn dùng', await count('.pcard-grid .pcard') === 5 && /Hạn 30 ngày/.test(await text('.pcard-grid')));
+  check('hiện bộ 12 thẻ mẫu kèm hạn dùng', await count('.pcard-grid .pcard') === 12 && /Hạn 30 ngày/.test(await text('.pcard-grid')));
   check('bảng học sinh của lớp', await count('table.pick tbody tr') === 5);
   check('lịch sử có 1 thẻ đã dùng', await count('[data-act="unuse"]') === 1);
   await click('[data-act="unuse"]');
@@ -412,7 +412,7 @@ await group('8b. Giáo viên sửa thẻ của học sinh', async () => {
   await sleep(200);
   check('bấm Sửa: mở form, không hỏi dùng thẻ',
     await count('select[name="card"]') === 1 && await count('input[name="expires"][type="date"]') === 1 && await count('.confirm-msg') === 0);
-  check('danh sách loại thẻ: thẻ hiện tại + các thẻ chưa giữ', await count('select[name="card"] option') === 5);
+  check('danh sách loại thẻ: thẻ hiện tại + các thẻ chưa giữ', await count('select[name="card"] option') === 12);
   await fill('input[name="expires"]', '2099-12-31');
   await formOk();
   await sleep(250);
@@ -463,7 +463,7 @@ await group('9. Thống kê', async () => {
   await sleep(300);
   await click('[data-sub="cards"]');
   await sleep(300);
-  check('tab Thẻ: 1 khung biểu đồ, ẩn Loại/Nguồn/Tiết', await count('.chart-box') === 1
+  check('tab Thẻ: 3 khung biểu đồ, ẩn Loại/Nguồn/Tiết', await count('.chart-box') === 3
     && await count('[data-f="type"], [data-f="source"], [data-f="period"]') === 0);
   check('đổi tab giữ nguyên bộ lọc', await ev("document.querySelector('[data-f=year]').value") !== '');
   await click('#resetFilter');
@@ -505,7 +505,7 @@ await group('10. Cài đặt: thẻ, năm học', async () => {
   check('upload ảnh hiện xem trước', await waitFor("!!document.querySelector('.modal .img-prev img')"));
   await modalOk();
   await sleep(300);
-  check('thẻ mới hiển thị bằng ảnh đã upload', await count('#setBody .pcard-art img') === 1 && await count('#setBody .pcard') === 6);
+  check('thẻ mới hiển thị bằng ảnh đã upload', await count('#setBody .pcard-art img') === 1 && await count('#setBody .pcard') === 13);
 
   await click('[data-tab="atp"]');
   await sleep(200);
@@ -521,7 +521,7 @@ await group('11. Lưu bền + giao diện hẹp', async () => {
   await send('Page.reload');
   await waitFor("document.getElementById('app') && !document.getElementById('app').hidden", 20000);
   await go('tiet');
-  check('tải lại trang: dữ liệu còn nguyên', await count('.stu') === 5 && await ev("TSTB.cards.list().length") === 6);
+  check('tải lại trang: dữ liệu còn nguyên', await count('.stu') === 5 && await ev("TSTB.cards.list().length") === 13);
 
   await send('Emulation.setDeviceMetricsOverride', { width: 600, height: 900, deviceScaleFactor: 1, mobile: false });
   await sleep(300);
@@ -565,7 +565,7 @@ await group('12. Xoá toàn bộ dữ liệu', async () => {
   check('phải xác nhận 2 lần', await count('.confirm-msg') === 1 && await ev('TSTB.classes.list().length') === 1);
   await modalOk();
   await sleep(500);
-  check('sau 2 lần xác nhận: dữ liệu sạch, thẻ mẫu trở lại', await ev('TSTB.classes.list().length') === 0 && await ev('TSTB.cards.list().length') === 5);
+  check('sau 2 lần xác nhận: dữ liệu sạch, thẻ mẫu trở lại', await ev('TSTB.classes.list().length') === 0 && await ev('TSTB.cards.list().length') === 12);
 
   await click('[data-sub="data:snaps"]');
   await sleep(200);
@@ -579,7 +579,7 @@ await group('12. Xoá toàn bộ dữ liệu', async () => {
   check('khôi phục phải xác nhận', /Khôi phục bản chụp/.test(await text('.confirm-msg')));
   await modalOk();
   await waitFor('TSTB.classes.list().length === 1');
-  check('khôi phục bản chụp: lớp và thẻ trở lại', await ev('TSTB.classes.list().length') === 1 && await ev('TSTB.cards.list().length') === 6);
+  check('khôi phục bản chụp: lớp và thẻ trở lại', await ev('TSTB.classes.list().length') === 1 && await ev('TSTB.cards.list().length') === 13);
   await waitFor("/Trước khi khôi phục/.test(document.getElementById('snapList').innerText)");
   check('khôi phục cũng tạo bản chụp "Trước khi khôi phục"', /Trước khi khôi phục/.test(await text('#snapList')));
 
